@@ -1,34 +1,27 @@
-class Cita {
-  final int id;
-  final int centroId;
-  final DateTime fecha;
-  final String hora;
-  String estado; // "agendada", "cancelada", "completada"
+// lib/models/cita.dart
+import 'centro_vacunacion.dart';
 
+class Cita {
+  int id;
+  String fechaHora;
+  String estado;
+  //Campana? campana;
+  CentroVacunacion? centroVacunacion;
+  //Vacunacion? vacunacion;
+
+  // Constructor principal
   Cita({
     required this.id,
-    required this.centroId,
-    required this.fecha,
-    required this.hora,
-    this.estado = "agendada",
+    required this.fechaHora,
+    this.estado = "AGENDADA",
+    //this.campana,
+    this.centroVacunacion,
+    //this.vacunacion,
   });
 
-  factory Cita.fromJson(Map<String, dynamic> json) {
-    return Cita(
-      id: json['id'],
-      centroId: json['centro_id'],
-      fecha: DateTime.parse(json['fecha']),
-      hora: json['hora'],
-      estado: json['estado'],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'centro_id': centroId,
-      'fecha': fecha.toIso8601String().split('T')[0], // Guarda solo YYYY-MM-DD
-      'hora': hora,
-      'estado': estado,
-    };
+  @override
+  String toString() {
+    // "Cita{id=$id, fechaHora='$fechaHora', estado='$estado', campana=$campana, centroVacunacion=$centroVacunacion, vacunacion=$vacunacion}";
+    return "Cita{id=$id, fechaHora='$fechaHora', estado='$estado', centroVacunacion=$centroVacunacion}";
   }
 }
