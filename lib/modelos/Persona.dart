@@ -1,6 +1,6 @@
-import 'package:gestor_aplicacion/modelos/cita.dart';
+import 'cita.dart';
 
-class Persona{
+class Persona {
   String _rut;
   String _nombres;
   String _apellidos;

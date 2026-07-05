@@ -1,22 +1,24 @@
 // lib/models/cita.dart
 import 'centro_vacunacion.dart';
+import 'vacunacion.dart';
+import 'campana.dart';
 
 class Cita {
   int id;
   String fechaHora;
   String estado;
-  //Campana? campana;
+  Campana? campana;
   CentroVacunacion? centroVacunacion;
-  //Vacunacion? vacunacion;
+  Vacunacion? vacunacion;
 
   // Constructor principal
   Cita({
     required this.id,
     required this.fechaHora,
     this.estado = "AGENDADA",
-    //this.campana,
+    this.campana,
     this.centroVacunacion,
-    //this.vacunacion,
+    this.vacunacion,
   });
 
   @override
