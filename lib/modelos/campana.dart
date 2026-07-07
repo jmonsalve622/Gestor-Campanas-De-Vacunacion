@@ -22,12 +22,17 @@ class Campana implements ComponenteVacunacion {
   });
 
   void agregarCentroVacunacion(CentroVacunacion centro) {
-    centros.add(centro);
+    if (!centros.any((element) => element.id == centro.id)) {
+      centros.add(centro);
+      centro.vincularCampana(this);
+    }
   }
 
   void eliminarCentroVacunacion(CentroVacunacion centro) {
     centros.remove(centro);
   }
+
+  List<CentroVacunacion> get centrosVacunacion => centros;
 
   void agregarVacunacion(Vacunacion vacunacion) {
     vacunaciones.add(vacunacion);
@@ -51,5 +56,4 @@ class Campana implements ComponenteVacunacion {
   String toString() {
     return 'Campana(id: $id, nombre: $nombre, descripcion: $descripcion, fechaInicio: $fechaInicio, fechaFin: $fechaFin, estado: $estado, centros: $centros, vacunaciones: $vacunaciones)';
   }
-
 }

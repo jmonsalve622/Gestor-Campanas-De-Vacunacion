@@ -1,34 +1,34 @@
 import 'cita.dart';
 
 class Persona {
-  String _rut;
-  String _nombres;
-  String _apellidos;
-  DateTime _fechaNacimiento;
-  String _correo;
-  String _telefono;
-  List<Cita> _citas = [];
+  final String _rut;
+  final String _nombres;
+  final String _apellidos;
+  final DateTime _fechaNacimiento;
+  final String _correo;
+  final String _telefono;
+  final List<Cita> _citas = [];
 
   Persona({
-    required this._rut,
-    required this._nombres,
-    required this._apellidos,
-    required this._fechaNacimiento,
-    required this._correo,
-    required this._telefono
-  }){
- 
-    if(!_esRutValido(_rut))
-      throw Exception("El RUT ingresado no es valido.");
-    
-    if(!_esCorreoValido(_correo))
+    required String rut,
+    required String nombres,
+    required String apellidos,
+    required DateTime fechaNacimiento,
+    required String correo,
+    required String telefono,
+  }) : _rut = rut,
+       _nombres = nombres,
+       _apellidos = apellidos,
+       _fechaNacimiento = fechaNacimiento,
+       _correo = correo,
+       _telefono = telefono {
+    if (!_esRutValido(_rut)) throw Exception("El RUT ingresado no es valido.");
+
+    if (!_esCorreoValido(_correo))
       throw Exception("El correo ingresado no es valido.");
 
-    if(!_esTelefonoValido(_telefono))
+    if (!_esTelefonoValido(_telefono))
       throw Exception("El telefono ingresado no es valido.");
-
-    
-
   }
 
   void agregarCita(Cita cita) {
@@ -40,30 +40,28 @@ class Persona {
   }
 
   // Verificacion formato caracteres@caracteres.2oMasCaracteres.
-  bool _esCorreoValido(String correo){
-    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(correo);
+  bool _esCorreoValido(String correo) {
+    return RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    ).hasMatch(correo);
   }
 
   // Verifica telofono sea de Chile.
-  bool _esTelefonoValido(String telefono){
+  bool _esTelefonoValido(String telefono) {
     String telefonoJunto = telefono.replaceAll(' ', '');
     return RegExp(r'^\+569[0-9]{8}$').hasMatch(telefonoJunto);
   }
 
   // Verifica tanto el formato del RUT, como si cumple con los requisitos de nu numero verificador.
-  bool _esRutValido(String rut){
-
+  bool _esRutValido(String rut) {
     // Primero ve como fue ingresado este rut.
     int? puntos;
-    if(!rut.contains("-"))
-      return false;
-    if(rut.contains(".")){
-      if(rut.length<11)
-        return false;
+    if (!rut.contains("-")) return false;
+    if (rut.contains(".")) {
+      if (rut.length < 11) return false;
       puntos = 0;
-    }else{
-      if(rut.length<9)
-        return false;
+    } else {
+      if (rut.length < 9) return false;
     }
 
     // Verificacion caracter a caracter segun revision anterior.
@@ -72,38 +70,42 @@ class Persona {
     bool raya = false;
     for (int j = 0; j < digitosRut.length; j++) {
       int? i = int.tryParse(digitosRut[j]);
-      if(i == null){
-        if(digitosRut[j] == "." && puntos != null){
-          if (puntos > 2){
+      if (i == null) {
+        if (digitosRut[j] == "." && puntos != null) {
+          if (puntos > 2) {
             return false;
           }
           puntos++;
           continue;
-        } else if((digitosRut[j] == "-") && (j == digitosRut.length-2)){
-          raya = true;  
+        } else if ((digitosRut[j] == "-") && (j == digitosRut.length - 2)) {
+          raya = true;
           continue;
-        }else if(raya && ((digitosRut[j] == "k") || (digitosRut[j] == "K")))
+        } else if (raya && ((digitosRut[j] == "k") || (digitosRut[j] == "K")))
           continue;
         return false;
       }
-      if(!raya){
+      if (!raya) {
         nums *= 10;
         nums += i;
       }
     }
-    if (nums>40000000 || nums < 500000 || (puntos !=2 && rut.contains("."))){
+    if (nums > 40000000 ||
+        nums < 500000 ||
+        (puntos != 2 && rut.contains("."))) {
       return false;
     }
 
     return _verificarModulo11(rut);
   }
-  
+
   bool _verificarModulo11(String rut) {
     // Dejamos el RUT solo con numeros y, si tiene, la k.
-    String rutLimpio = rut.replaceAll('.', '').replaceAll('-', '').toUpperCase();
+    String rutLimpio = rut
+        .replaceAll('.', '')
+        .replaceAll('-', '')
+        .toUpperCase();
 
-    if (rutLimpio.length < 2) 
-      return false;
+    if (rutLimpio.length < 2) return false;
 
     // Separamos del dígito verificador (el último carácter).
     String cuerpo = rutLimpio.substring(0, rutLimpio.length - 1);
@@ -114,10 +116,10 @@ class Persona {
 
     for (int i = cuerpo.length - 1; i >= 0; i--) {
       int? digito = int.tryParse(cuerpo[i]);
-      if (digito == null) return false; 
+      if (digito == null) return false;
 
       suma += digito * multiplicador;
-      
+
       multiplicador++;
       if (multiplicador > 7) {
         multiplicador = 2;
@@ -140,58 +142,67 @@ class Persona {
     return dvIngresado == dvEsperado;
   }
 
-  String getRut(){
+  String getRut() {
     return _rut;
   }
 
-  String getNombres(){
+  String get rut => _rut;
+
+  String getNombres() {
     return _nombres;
   }
 
-  String getApellidos(){
+  String get nombres => _nombres;
+
+  String getApellidos() {
     return _apellidos;
   }
 
-  DateTime getFechaNacimiento(){
+  String get apellidos => _apellidos;
+
+  DateTime getFechaNacimiento() {
     return _fechaNacimiento;
   }
 
-  String getCorreo(){
+  DateTime get fechaNacimiento => _fechaNacimiento;
+
+  String getCorreo() {
     return _correo;
   }
 
-  String getTelefono(){
+  String get correo => _correo;
+
+  String getTelefono() {
     return _telefono;
   }
 
-  List<Cita> getCitas(){
+  String get telefono => _telefono;
+
+  List<Cita> getCitas() {
     return _citas;
   }
+
+  List<Cita> get citas => _citas;
 
   int getEdad() {
     DateTime hoy = DateTime.now();
     int edad = hoy.year - _fechaNacimiento.year;
-    
-    if (hoy.month < _fechaNacimiento.month || 
-      (hoy.month == _fechaNacimiento.month && hoy.day < _fechaNacimiento.day)) {
+
+    if (hoy.month < _fechaNacimiento.month ||
+        (hoy.month == _fechaNacimiento.month &&
+            hoy.day < _fechaNacimiento.day)) {
       edad--;
     }
-    
+
     return edad;
   }
 
   @override
   String toString() {
-    String pre = "Persona{RUT=$_rut, nombres=$_nombres, apellidos=$_apellidos , fecha_nacimiento=${_fechaNacimiento.toString()}, correo=$_correo, telefono=$_telefono \n\nCitas:\n";
+    String pre =
+        "Persona{RUT=$_rut, nombres=$_nombres, apellidos=$_apellidos , fecha_nacimiento=${_fechaNacimiento.toString()}, correo=$_correo, telefono=$_telefono \n\nCitas:\n";
     String listaCitas = _citas.map((c) => "- ${c.toString()}").join('\n');
 
-    return pre+listaCitas;
+    return pre + listaCitas;
   }
-
-}
-
-void main(){
-  Persona p = Persona(rut: "21.343.419-5", nombres: "poya", apellidos: "apellidos", fechaNacimiento: DateTime(2000), correo: "correo@gmail.cl", telefono: "+56966774455");
-  print(p.toString());
-  print("object");
 }

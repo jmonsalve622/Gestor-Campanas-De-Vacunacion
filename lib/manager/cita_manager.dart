@@ -32,7 +32,11 @@ class CitaManager {
   }
 
   void agendarCita(String fechaHora) {
-    Cita cita = Cita(id: _contadorId++, fechaHora: fechaHora);
+    Cita cita = Cita(
+      id: _contadorId++,
+      fechaHora: fechaHora,
+      estado: CitaEstado.reservada,
+    );
     _citas.add(cita);
     _notificar(cita, "AGENDADA");
   }
@@ -43,7 +47,7 @@ class CitaManager {
       print("Cita no encontrada.");
       return;
     }
-    cita.estado = "CANCELADA";
+    cita.estado = CitaEstado.cancelada;
     _notificar(cita, "CANCELADA");
   }
 
@@ -53,8 +57,18 @@ class CitaManager {
       print("Cita no encontrada.");
       return;
     }
-    cita.fechaHora = nuevaFecha;
-    cita.estado = "REPROGRAMADA";
+    cita.estado = CitaEstado.reagendada;
+    Cita nuevaCita = Cita(
+      id: _contadorId++,
+      fechaHora: nuevaFecha,
+      estado: CitaEstado.reservada,
+      campana: cita.campana,
+      centroVacunacion: cita.centroVacunacion,
+      pacienteRut: cita.pacienteRut,
+      pacienteNombre: cita.pacienteNombre,
+      pacienteCorreo: cita.pacienteCorreo,
+    );
+    _citas.add(nuevaCita);
     _notificar(cita, "REPROGRAMADA");
   }
 

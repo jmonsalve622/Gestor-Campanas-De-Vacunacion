@@ -1,6 +1,7 @@
 // lib/models/centro_vacunacion.dart
 import 'componente_vacunacion.dart';
 import 'cita.dart';
+import 'campana.dart';
 
 class CentroVacunacion implements ComponenteVacunacion {
   int id;
@@ -9,7 +10,9 @@ class CentroVacunacion implements ComponenteVacunacion {
   String direccion;
   String comuna;
   String region;
+  List<String> horariosBase;
   List<Cita> citas = [];
+  List<Campana> campanas = [];
 
   CentroVacunacion({
     required this.id,
@@ -18,7 +21,8 @@ class CentroVacunacion implements ComponenteVacunacion {
     required this.direccion,
     required this.comuna,
     required this.region,
-  });
+    List<String>? horariosBase,
+  }) : horariosBase = horariosBase ?? const [];
 
   // --- Composite: gestión de citas ---
   void agregarCita(Cita cita) {
@@ -29,7 +33,110 @@ class CentroVacunacion implements ComponenteVacunacion {
     citas.remove(cita);
   }
 
+  void vincularCampana(Campana campana) {
+    if (!campanas.any((element) => element.id == campana.id)) {
+      campanas.add(campana);
+    }
+  }
+
+  bool horarioDisponible(String horario) {
+    return !citas.any(
+      (cita) =>
+          cita.fechaHora == horario &&
+          (cita.estado == CitaEstado.reservada ||
+              cita.estado == CitaEstado.completada),
+    );
+  }
+
+  List<String> get horariosDisponibles {
+    if (horariosBase.isEmpty) {
+      return [];
+    }
+    return horariosBase.where(horarioDisponible).toList();
+  }
+
+  List<Cita> get citasDisponibles =>
+      citas.where((cita) => cita.estado == CitaEstado.disponible).toList();
+
+  List<Cita> get citasReservadas =>
+      citas.where((cita) => cita.estado == CitaEstado.reservada).toList();
+
+  List<Cita> get citasReagendadas =>
+      citas.where((cita) => cita.estado == CitaEstado.reagendada).toList();
+
+  List<Cita> get citasCompletadas =>
+      citas.where((cita) => cita.estado == CitaEstado.completada).toList();
+
+  List<Cita> get citasCanceladas =>
+      citas.where((cita) => cita.estado == CitaEstado.cancelada).toList();
+
   List<Cita> get citasList => citas;
+
+  Cita reservarHorario({
+    required int id,
+    required String horario,
+    required String rut,
+    required String nombre,
+    required String correo,
+    Campana? campana,
+    String responsable = 'Sistema',
+  }) {
+    if (!horarioDisponible(horario)) {
+      throw StateError('El horario no esta disponible.');
+    }
+
+    final cita = Cita(
+      id: id,
+      fechaHora: horario,
+      estado: CitaEstado.reservada,
+      pacienteRut: rut,
+      pacienteNombre: nombre,
+      pacienteCorreo: correo,
+      centroVacunacion: this,
+      campana: campana,
+    );
+    cita.registrarCambioEstado(
+      CitaEstado.reservada,
+      responsable: responsable,
+      detalle: 'Reserva registrada en ${nombre} para horario $horario',
+    );
+    citas.add(cita);
+    return cita;
+  }
+
+  Cita reagendarCita({
+    required Cita cita,
+    required int nuevaId,
+    required String nuevoHorario,
+    String responsable = 'Sistema',
+  }) {
+    if (!citas.contains(cita)) {
+      throw StateError('La cita no pertenece a este centro.');
+    }
+
+    final nuevaCita = cita.reagendar(
+      nuevaId: nuevaId,
+      nuevaFechaHora: nuevoHorario,
+      responsable: responsable,
+    );
+    nuevaCita.centroVacunacion = this;
+    citas.add(nuevaCita);
+    return nuevaCita;
+  }
+
+  void completarCita(Cita cita, {String responsable = 'Sistema'}) {
+    if (!citas.contains(cita)) {
+      throw StateError('La cita no pertenece a este centro.');
+    }
+    cita.completar(responsable: responsable);
+  }
+
+  void cancelarCita(Cita cita, {String responsable = 'Sistema'}) {
+    if (!citas.contains(cita)) {
+      throw StateError('La cita no pertenece a este centro.');
+    }
+    cita.cancelar(responsable: responsable);
+  }
 
   @override
   int getCitas() {
@@ -38,8 +145,7 @@ class CentroVacunacion implements ComponenteVacunacion {
 
   @override
   int getVacunas() {
-    // citas.where((c) => c.vacunacion != null).length;
-    return 0;
+    return citas.where((cita) => cita.estado == CitaEstado.completada).length;
   }
 
   /*
@@ -115,6 +221,6 @@ class CentroVacunacion implements ComponenteVacunacion {
   */
   @override
   String toString() {
-    return "CentroVacunacion{id=$id, nombre='$nombre', tipo='$tipo', direccion='$direccion', comuna='$comuna', region='$region'}";
+    return "CentroVacunacion{id=$id, nombre='$nombre', tipo='$tipo', direccion='$direccion', comuna='$comuna', region='$region', horariosBase=$horariosBase}";
   }
 }
