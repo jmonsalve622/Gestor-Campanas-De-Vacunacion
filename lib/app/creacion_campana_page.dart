@@ -11,6 +11,7 @@ class CreacionCampanaPage extends StatefulWidget {
     required this.todosLosCentros,
     required this.todosLosAdministradores,
     required this.onCrearCampana,
+    required this.onBack,
     this.onLogout,
   });
 
@@ -18,6 +19,7 @@ class CreacionCampanaPage extends StatefulWidget {
   final List<CentroVacunacion> todosLosCentros;
   final List<AdminCampana> todosLosAdministradores;
   final Function(Campana campana, String vacunaNombre, List<String> admins) onCrearCampana;
+  final VoidCallback onBack;
   final VoidCallback? onLogout;
 
   @override
@@ -170,6 +172,11 @@ class _CreacionCampanaPageState extends State<CreacionCampanaPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF00AAFF),
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          tooltip: 'Volver al panel principal',
+          onPressed: widget.onBack, // Ejecuta la función que le pasaremos desde el Shell
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: const [
