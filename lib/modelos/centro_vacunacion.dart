@@ -39,10 +39,11 @@ class CentroVacunacion implements ComponenteVacunacion {
     }
   }
 
-  bool horarioDisponible(String horario) {
+  bool horarioDisponible(String horario, {String? fecha}) {
     return !citas.any(
       (cita) =>
           cita.fechaHora == horario &&
+          (fecha == null || cita.fecha == null || cita.fecha == fecha) &&
           (cita.estado == CitaEstado.reservada ||
               cita.estado == CitaEstado.completada),
     );
@@ -52,7 +53,15 @@ class CentroVacunacion implements ComponenteVacunacion {
     if (horariosBase.isEmpty) {
       return [];
     }
-    return horariosBase.where(horarioDisponible).toList();
+    return horariosBase.where((h) => horarioDisponible(h)).toList();
+  }
+
+  /// Horarios disponibles para una fecha específica
+  List<String> horariosDisponiblesPorFecha(String fecha) {
+    if (horariosBase.isEmpty) {
+      return [];
+    }
+    return horariosBase.where((h) => horarioDisponible(h, fecha: fecha)).toList();
   }
 
   List<Cita> get citasDisponibles =>
@@ -78,16 +87,18 @@ class CentroVacunacion implements ComponenteVacunacion {
     required String rut,
     required String nombre,
     required String correo,
+    String? fecha,
     Campana? campana,
     String responsable = 'Sistema',
   }) {
-    if (!horarioDisponible(horario)) {
+    if (!horarioDisponible(horario, fecha: fecha)) {
       throw StateError('El horario no esta disponible.');
     }
 
     final cita = Cita(
       id: id,
       fechaHora: horario,
+      fecha: fecha,
       estado: CitaEstado.reservada,
       pacienteRut: rut,
       pacienteNombre: nombre,
@@ -98,7 +109,7 @@ class CentroVacunacion implements ComponenteVacunacion {
     cita.registrarCambioEstado(
       CitaEstado.reservada,
       responsable: responsable,
-      detalle: 'Reserva registrada en ${nombre} para horario $horario',
+      detalle: 'Reserva registrada en ${nombre} para horario $horario${fecha != null ? ' el $fecha' : ''}',
     );
     citas.add(cita);
     return cita;

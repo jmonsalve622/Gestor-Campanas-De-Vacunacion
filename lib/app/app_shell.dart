@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../modelos/Persona.dart';
 import '../modelos/campana.dart';
@@ -8,6 +10,9 @@ import '../modelos/vacunacion.dart';
 import '../servicios/auth/auth_service.dart';
 import '../servicios/notificaciones/notification_service.dart';
 import '../servicios/notificaciones/resend_notification_service.dart';
+import 'peticion_cita_page.dart';
+import 'registro_vacuna_page.dart';
+import 'creacion_campana_page.dart';
 
 class GestorCampanasApp extends StatelessWidget {
   const GestorCampanasApp({super.key});
@@ -16,11 +21,21 @@ class GestorCampanasApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Gestor de Campanas de Vacunacion',
+      title: 'Sistema de campañas de vacunación',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F766E)),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00AAFF)),
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'CL'),
+        Locale('es'),
+        Locale('en'),
+      ],
       home: const AppShell(),
     );
   }
@@ -35,7 +50,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   final AuthService _authService = AuthService();
-  final NotificationService _notificationService = ResendNotificationService();
+  final ResendNotificationService _notificationService = ResendNotificationService();
 
   final List<Campana> _campanas = [];
   final List<CentroVacunacion> _centros = [];
@@ -90,6 +105,8 @@ class _AppShellState extends State<AppShell> {
       TextEditingController();
   final TextEditingController _registroPacientePasswordController =
       TextEditingController(text: '123456');
+  final TextEditingController _resendApiKeyController =
+      TextEditingController();
 
   int? _selectedLinkCampanaId;
   int? _selectedLinkCentroId;
@@ -100,17 +117,27 @@ class _AppShellState extends State<AppShell> {
   int _nextCitaId = 10;
   int _nextVacunacionId = 1;
   String _status = 'Listo para administrar campañas, centros y citas.';
+  bool _showPeticionCita = false;
+  bool _showRegistroVacuna = false;
+  bool _showCreacionCampana = false;
+  Timer? _reminderTimer;
 
   @override
   void initState() {
     super.initState();
     _seedDemoData();
+    // Iniciar chequeo de recordatorios cada 1 minuto (o 30s para pruebas)
+    _reminderTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _revisarRecordatorios();
+    });
   }
 
   @override
   void dispose() {
+    _reminderTimer?.cancel();
     _loginEmailController.dispose();
     _loginPasswordController.dispose();
+    _resendApiKeyController.dispose();
     _pacienteRutController.dispose();
     _pacienteNombresController.dispose();
     _pacienteApellidosController.dispose();
@@ -135,51 +162,60 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _seedDemoData() {
-    final campana = Campana(
+    // Campaña de Sarampión (coincide con la imagen de referencia)
+    final campanaSarampion = Campana(
       id: 1,
-      nombre: 'Campana Invierno 2026',
+      nombre: 'Sarampión',
       descripcion:
-          'Cobertura preventiva para adultos mayores y pacientes cronicos.',
-      fechaInicio: '2026-06-01',
-      fechaFin: '2026-08-31',
+          'Campaña de vacunación contra el Sarampión para la población general.',
+      fechaInicio: '2027-06-01',
+      fechaFin: '2027-12-31',
     );
 
+    final campanaInvierno = Campana(
+      id: 2,
+      nombre: 'Influenza Invierno 2027',
+      descripcion:
+          'Cobertura preventiva para adultos mayores y pacientes cronicos.',
+      fechaInicio: '2027-06-01',
+      fechaFin: '2027-08-31',
+    );
+
+    // Centro principal (coincide con la imagen)
     final centro1 = CentroVacunacion(
       id: 1,
-      nombre: 'CESFAM Central',
+      nombre: 'Hospital Clínico Regional Dr. Guillermo Grant Benavente',
       tipo: 'Publico',
-      direccion: 'Av. Principal 123',
-      comuna: 'Santiago',
-      region: 'Metropolitana',
+      direccion: 'San Martín 1436',
+      comuna: 'Concepción',
+      region: 'Bío Bío',
       horariosBase: const [
-        '09:00',
-        '09:30',
-        '10:00',
-        '10:30',
-        '11:00',
-        '11:30',
+        '09:00', '09:10', '09:20', '09:30', '09:40', '09:50',
+        '10:00', '10:10', '10:20', '10:30', '10:40', '10:50',
+        '11:00', '11:10',
       ],
     );
 
     final centro2 = CentroVacunacion(
       id: 2,
-      nombre: 'Posta Norte',
+      nombre: 'CESFAM Central Concepción',
       tipo: 'Publico',
-      direccion: 'Calle Norte 456',
-      comuna: 'Recoleta',
-      region: 'Metropolitana',
+      direccion: 'Av. Los Carrera 850',
+      comuna: 'Concepción',
+      region: 'Bío Bío',
       horariosBase: const ['08:00', '08:30', '09:00', '09:30', '10:00'],
     );
 
-    campana.agregarCentroVacunacion(centro1);
-    campana.agregarCentroVacunacion(centro2);
+    campanaSarampion.agregarCentroVacunacion(centro1);
+    campanaSarampion.agregarCentroVacunacion(centro2);
+    campanaInvierno.agregarCentroVacunacion(centro2);
 
     final pacienteDemo = Persona(
       rut: '21.343.419-5',
-      nombres: 'Ana',
-      apellidos: 'Perez',
+      nombres: 'Gustavo',
+      apellidos: 'Riquelme',
       fechaNacimiento: DateTime(1990, 1, 1),
-      correo: 'paciente@demo.cl',
+      correo: 'alfonsogg111@gmail.com',
       telefono: '+56912345678',
     );
 
@@ -189,7 +225,7 @@ class _AppShellState extends State<AppShell> {
       rut: pacienteDemo.rut,
       nombre: '${pacienteDemo.nombres} ${pacienteDemo.apellidos}',
       correo: pacienteDemo.correo,
-      campana: campana,
+      campana: campanaSarampion,
     );
     pacienteDemo.agregarCita(citaReservada);
     _personasPorCita[citaReservada.id] = pacienteDemo;
@@ -200,28 +236,28 @@ class _AppShellState extends State<AppShell> {
       rut: pacienteDemo.rut,
       nombre: '${pacienteDemo.nombres} ${pacienteDemo.apellidos}',
       correo: pacienteDemo.correo,
-      campana: campana,
+      campana: campanaSarampion,
     );
     final vacunacion = Vacunacion(
       id: _nextVacunacionId++,
       fechaHora: citaCompletada.fechaHora,
       observaciones: 'Vacuna administrada en demo.',
-      campana: campana,
+      campana: campanaSarampion,
       cita: citaCompletada,
     );
     citaCompletada.completar(nuevaVacunacion: vacunacion);
-    campana.agregarVacunacion(vacunacion);
+    campanaSarampion.agregarVacunacion(vacunacion);
     pacienteDemo.agregarCita(citaCompletada);
     _personasPorCita[citaCompletada.id] = pacienteDemo;
 
-    _campanas.add(campana);
+    _campanas.addAll([campanaSarampion, campanaInvierno]);
     _centros.addAll([centro1, centro2]);
     _pacientesRegistrados[pacienteDemo.correo] = pacienteDemo;
-    _linkCampanaController.text = campana.id.toString();
+    _linkCampanaController.text = campanaSarampion.id.toString();
     _linkCentroController.text = centro1.id.toString();
-    _selectedLinkCampanaId = campana.id;
+    _selectedLinkCampanaId = campanaSarampion.id;
     _selectedLinkCentroId = centro1.id;
-    _selectedSearchCampanaId = campana.id;
+    _selectedSearchCampanaId = campanaSarampion.id;
     _personaConsultaController.text = pacienteDemo.correo;
   }
 
@@ -252,7 +288,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   Persona _crearPersonaPaciente() {
-    return Persona(
+    final correo = _pacienteCorreoController.text.trim().toLowerCase();
+    
+    if (correo.isNotEmpty && _pacientesRegistrados.containsKey(correo)) {
+      return _pacientesRegistrados[correo]!;
+    }
+    
+    final nueva = Persona(
       rut: _pacienteRutController.text.trim(),
       nombres: _pacienteNombresController.text.trim(),
       apellidos: _pacienteApellidosController.text.trim(),
@@ -260,6 +302,12 @@ class _AppShellState extends State<AppShell> {
       correo: _pacienteCorreoController.text.trim(),
       telefono: _pacienteTelefonoController.text.trim(),
     );
+    
+    if (correo.isNotEmpty) {
+      _pacientesRegistrados[correo] = nueva;
+    }
+    
+    return nueva;
   }
 
   Persona? _buscarPersonaConsulta(String consulta) {
@@ -489,7 +537,7 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  Future<void> _reservarHorario(CentroVacunacion centro, String horario) async {
+  Future<void> _reservarHorario(CentroVacunacion centro, String horario, {String? fecha}) async {
     try {
       _authService.requireSession();
       final persona = _crearPersonaPaciente();
@@ -503,6 +551,7 @@ class _AppShellState extends State<AppShell> {
         rut: persona.rut,
         nombre: '${persona.nombres} ${persona.apellidos}',
         correo: persona.correo,
+        fecha: fecha,
         campana: campana,
       );
       persona.agregarCita(cita);
@@ -517,7 +566,7 @@ class _AppShellState extends State<AppShell> {
 
       setState(() {
         _status =
-            'Reserva creada para ${persona.nombres} ${persona.apellidos} en ${centro.nombre}.';
+            'Reserva creada para ${persona.nombres} ${persona.apellidos} en ${centro.nombre}${fecha != null ? ' el $fecha' : ''}.';
       });
     } catch (error) {
       setState(() {
@@ -526,35 +575,37 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  Future<String?> _pedirNuevoHorario(String horarioActual) {
-    final controller = TextEditingController(text: horarioActual);
-    return showDialog<String>(
+  Future<String?> _pedirNuevoHorario(String horarioActual) async {
+    TimeOfDay initialTime = TimeOfDay.now();
+    try {
+      final parts = horarioActual.split(':');
+      if (parts.length == 2) {
+        initialTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+    } catch (_) {}
+
+    final TimeOfDay? newTime = await showTimePicker(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reagendar cita'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'Nuevo horario'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Aceptar'),
-          ),
-        ],
-      ),
+      initialTime: initialTime,
+      helpText: 'Seleccionar nuevo horario para reagendar',
     );
+
+    if (newTime != null) {
+      final hh = newTime.hour.toString().padLeft(2, '0');
+      final mm = newTime.minute.toString().padLeft(2, '0');
+      return '$hh:$mm';
+    }
+    return null;
   }
 
   Future<void> _reagendarCita(CentroVacunacion centro, Cita cita) async {
     final session = _authService.requireSession();
-    if (!session.user.canCreateAppointments) {
+    final esPaciente = session.user.role == AppRole.paciente;
+    final esPropia = cita.pacienteCorreo == session.user.email;
+
+    if (!session.user.canCreateAppointments && !(esPaciente && esPropia)) {
       setState(() {
-        _status = 'El rol ${session.user.role.label} no puede reagendar citas.';
+        _status = 'No tienes permiso para reagendar esta cita.';
       });
       return;
     }
@@ -588,10 +639,51 @@ class _AppShellState extends State<AppShell> {
         _status =
             'Cita ${cita.id} reagendada. Nueva cita ${nuevaCita.id} creada en $nuevoHorario.';
       });
-    } catch (error) {
+    } catch (e) {
       setState(() {
-        _status = 'No se pudo reagendar la cita. Revisa la disponibilidad.';
+        _status = 'Error al reagendar: $e';
       });
+    }
+  }
+
+  Future<void> _registrarVacunacion(
+      Persona paciente, Cita cita, String nombreVacuna, String observaciones) async {
+    final session = _authService.requireSession();
+    if (!session.user.canRegisterVaccinations) {
+      throw Exception('Permisos insuficientes para registrar vacunas.');
+    }
+
+    if (cita.campana == null) {
+      throw Exception('La cita no tiene campaña asociada.');
+    }
+
+    final now = DateTime.now();
+    final fechaFormat = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    final vacunacion = Vacunacion(
+      id: _nextVacunacionId++,
+      fechaHora: fechaFormat,
+      observaciones: 'Vacuna: $nombreVacuna. $observaciones',
+      campana: cita.campana,
+      cita: cita,
+    );
+
+    setState(() {
+      cita.completar(nuevaVacunacion: vacunacion);
+      cita.campana!.agregarVacunacion(vacunacion);
+      _status = 'Vacuna registrada para ${paciente.nombres} ${paciente.apellidos}.';
+    });
+
+    try {
+      await _notificationService.sendVaccinationConfirmation(
+        from: 'Gestor Vacunas <onboarding@resend.dev>',
+        to: paciente.correo,
+        persona: paciente,
+        cita: cita,
+      );
+    } catch (e) {
+      // Si falla la notificación no deshacemos el registro
+      debugPrint('No se pudo enviar la notificación de vacunación: $e');
     }
   }
 
@@ -697,6 +789,47 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  Future<void> _revisarRecordatorios() async {
+    final now = DateTime.now();
+
+    for (final centro in _centros) {
+      for (final cita in centro.citas) {
+        // Solo para citas reservadas que no han recibido recordatorio
+        if (cita.estado == CitaEstado.reservada && !cita.recordatorioEnviado) {
+          // Parsear fecha y hora
+          DateTime citaDate;
+          try {
+            // Si no tiene fecha específica, asumimos el mismo día para pruebas
+            final datePart = cita.fecha ?? 
+                "\${now.year}-\${now.month.toString().padLeft(2, '0')}-\${now.day.toString().padLeft(2, '0')}";
+            final timePart = cita.fechaHora.length == 5 ? "\${cita.fechaHora}:00" : cita.fechaHora; // "09:00" -> "09:00:00"
+            citaDate = DateTime.parse("\$datePart \$timePart");
+          } catch (e) {
+            continue; // Ignorar citas con fechas mal formateadas
+          }
+
+          final diferenciaHoras = citaDate.difference(now).inHours;
+
+          // Si la cita es en 24 horas o menos y aún está en el futuro
+          if (diferenciaHoras >= 0 && diferenciaHoras <= 24) {
+            cita.recordatorioEnviado = true; // Marcar para no reenviar
+            final persona = _personasPorCita[cita.id];
+            
+            if (persona != null) {
+              await _notificationService.sendReminderNotification(
+                from: 'Gestor Vacunas <onboarding@resend.dev>',
+                to: persona.correo,
+                persona: persona,
+                cita: cita,
+              );
+              // Podríamos actualizar el estado o log si queremos
+            }
+          }
+        }
+      }
+    }
+  }
+
   Future<void> _enviarRecordatoriosSimulados() async {
     final session = _authService.requireSession();
     if (!session.user.canCreateAppointments &&
@@ -732,9 +865,9 @@ class _AppShellState extends State<AppShell> {
   Color _colorEstado(CitaEstado estado) {
     switch (estado) {
       case CitaEstado.disponible:
-        return const Color(0xFF0F766E);
+        return const Color(0xFF00AAFF);
       case CitaEstado.reservada:
-        return const Color(0xFF2563EB);
+        return const Color(0xFF0088DD);
       case CitaEstado.reagendada:
         return const Color(0xFFF59E0B);
       case CitaEstado.completada:
@@ -753,11 +886,102 @@ class _AppShellState extends State<AppShell> {
         session?.user.canCreateAppointments == true;
     final centrosVisibles = _filtrarCentros();
 
+    // ─── Vista de Petición de Cita ───
+    if (_showPeticionCita && session != null) {
+      return PeticionCitaPage(
+        campanas: _campanas,
+        centros: _centros,
+        userName: session.user.fullName,
+        onConfirmar: (centro, horario, {String? fecha}) =>
+            _reservarHorario(centro, horario, fecha: fecha),
+        onBack: () => setState(() => _showPeticionCita = false),
+      );
+    }
+
+    final esVacunador = session?.user.role == AppRole.vacunador;
+    final userCentrosIds = session?.user.centrosIds ?? [];
+    final centrosAsignados = _centros.where((c) => userCentrosIds.contains(c.id)).toList();
+    final centrosParaRegistro = (centrosAsignados.isEmpty && session?.user.role == AppRole.admin) 
+        ? _centros 
+        : centrosAsignados;
+
+    final userCampanasIds = session?.user.campanasIds ?? [];
+    final campanasAsignadas = _campanas.where((c) => userCampanasIds.contains(c.id)).toList();
+    final campanasParaRegistro = (campanasAsignadas.isEmpty && session?.user.role == AppRole.admin)
+        ? _campanas
+        : campanasAsignadas;
+
+    // ─── Vista de Registro de Vacuna ───
+    if (session != null && (esVacunador || (_showRegistroVacuna && puedeGestionarCitas))) {
+      return RegistroVacunaPage(
+        campanasAsignadas: campanasParaRegistro,
+        centrosAsignados: centrosParaRegistro,
+        personalMedicoNombre: session.user.fullName,
+        onSearchRut: _buscarPersonaConsulta,
+        onRegistrar: _registrarVacunacion,
+        onBack: esVacunador ? null : () => setState(() => _showRegistroVacuna = false),
+        onLogout: esVacunador ? _logout : null,
+      );
+    }
+
+    // ─── Vista de Creación de Campaña ───
+    if (_showCreacionCampana && session != null && esAdmin) {
+      return CreacionCampanaPage(
+        adminName: session.user.fullName,
+        todosLosCentros: _centros,
+        onCrearCampana: (nuevaCampana, vacunaNombre, admins) {
+          setState(() {
+            nuevaCampana.id = _nextCampanaId++;
+            _campanas.add(nuevaCampana);
+            // Optionally link admins if needed in the future
+            _showCreacionCampana = false;
+            _status = 'Campaña ${nuevaCampana.nombre} creada exitosamente.';
+          });
+        },
+        onLogout: _logout,
+      );
+    }
+
+    // ─── Vista principal (panel de administración) ───
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestor de Vacunacion'),
-        centerTitle: false,
-        backgroundColor: Colors.white.withValues(alpha: 0.9),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Sistema de campañas de vacunación',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              'Ministerio de Salud',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        centerTitle: true,
+        backgroundColor: const Color(0xFF00AAFF),
+        foregroundColor: Colors.white,
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.local_hospital_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ),
         actions: [
           if (session != null)
             Padding(
@@ -765,22 +989,25 @@ class _AppShellState extends State<AppShell> {
               child: PopupMenuButton<String>(
                 offset: const Offset(0, 48),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE6FFFA),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color(0xFF99F6E4)),
+                    color: const Color(0xFF0088DD),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      width: 2,
+                    ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.account_circle_outlined, size: 18),
-                      const SizedBox(width: 8),
-                      Text(session.user.fullName),
-                    ],
+                  child: Center(
+                    child: Text(
+                      _getUserInitials(session.user.fullName),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
                 itemBuilder: (context) => [
@@ -791,32 +1018,65 @@ class _AppShellState extends State<AppShell> {
                     ),
                   ),
                   const PopupMenuDivider(),
-                  PopupMenuItem<String>(
+                  if (puedeGestionarCitas && !esAdmin)
+                    const PopupMenuItem<String>(
+                      value: 'registro_vacuna',
+                      child: Row(
+                        children: [
+                          Icon(Icons.vaccines, size: 18, color: Color(0xFF00AAFF)),
+                          SizedBox(width: 8),
+                          Text('Registrar vacuna'),
+                        ],
+                      ),
+                    ),
+                  if (puedeGestionarCitas && !esAdmin) const PopupMenuDivider(),
+                  if (esAdmin)
+                    const PopupMenuItem<String>(
+                      value: 'creacion_campana',
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_box, size: 18, color: Color(0xFF00AAFF)),
+                          SizedBox(width: 8),
+                          Text('Crear Campaña'),
+                        ],
+                      ),
+                    ),
+                  if (esAdmin) const PopupMenuDivider(),
+                  const PopupMenuItem<String>(
                     value: 'logout',
-                    child: const Text('Cerrar sesion'),
+                    child: Text('Cerrar sesion'),
                   ),
                 ],
                 onSelected: (value) {
                   if (value == 'logout') {
                     _logout();
+                  } else if (value == 'registro_vacuna') {
+                    setState(() => _showRegistroVacuna = true);
+                  } else if (value == 'creacion_campana') {
+                    setState(() => _showCreacionCampana = true);
                   }
                 },
               ),
             ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF042F2E), Color(0xFF0F766E), Color(0xFFECFEFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Center(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF003355), Color(0xFF00AAFF), Color(0xFFE8F7FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1160),
                 child: Card(
@@ -830,10 +1090,16 @@ class _AppShellState extends State<AppShell> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Sistema de Vacunacion',
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Sistema de Vacunación',
+                                style: Theme.of(context).textTheme.headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Text(_status),
@@ -845,21 +1111,18 @@ class _AppShellState extends State<AppShell> {
                             onLogin: _login,
                           )
                         else ...[
-                          _PatientProfilePanel(
-                            rutController: _pacienteRutController,
-                            nombresController: _pacienteNombresController,
-                            apellidosController: _pacienteApellidosController,
-                            correoController: _pacienteCorreoController,
-                            telefonoController: _pacienteTelefonoController,
-                          ),
-                          const SizedBox(height: 16),
+                          if (!esAdmin) ...[
+                            _PatientProfilePanel(
+                              rutController: _pacienteRutController,
+                              nombresController: _pacienteNombresController,
+                              apellidosController: _pacienteApellidosController,
+                              correoController: _pacienteCorreoController,
+                              telefonoController: _pacienteTelefonoController,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           if (esAdmin)
                             _AdminManagementPanel(
-                              campanaNombreController: _campanaNombreController,
-                              campanaDescripcionController:
-                                  _campanaDescripcionController,
-                              campanaInicioController: _campanaInicioController,
-                              campanaFinController: _campanaFinController,
                               centroNombreController: _centroNombreController,
                               centroTipoController: _centroTipoController,
                               centroDireccionController:
@@ -884,9 +1147,16 @@ class _AppShellState extends State<AppShell> {
                                   _selectedLinkCentroId = value;
                                 });
                               },
-                              onCrearCampana: _crearCampana,
                               onCrearCentro: _crearCentro,
                               onVincular: _vincularCentroACampana,
+                              resendApiKeyController: _resendApiKeyController,
+                              onUpdateApiKey: () {
+                                _notificationService.dynamicApiKey =
+                                    _resendApiKeyController.text.trim();
+                                setState(() {
+                                  _status = 'API Key de notificaciones actualizada.';
+                                });
+                              },
                             ),
                           if (esAdmin) ...[
                             const SizedBox(height: 16),
@@ -902,31 +1172,68 @@ class _AppShellState extends State<AppShell> {
                             ),
                           ],
                           const SizedBox(height: 16),
-                          _CampaignsPanel(campanas: _campanas),
-                          const SizedBox(height: 16),
-                          _CentersSearchPanel(
-                            centroNombreController:
-                                _searchCentroNombreController,
+                          _CampaignsPanel(
                             campanas: _campanas,
-                            selectedCampanaId: _selectedSearchCampanaId,
-                            onCampanaChanged: (value) {
+                            esAdmin: esAdmin,
+                            onTerminarCampana: (campana) {
                               setState(() {
-                                _selectedSearchCampanaId = value;
+                                campana.estado = 'TERMINADA';
+                                _status = 'Campaña ${campana.nombre} terminada.';
                               });
                             },
-                            onChanged: () => setState(() {}),
                           ),
                           const SizedBox(height: 16),
                           _CentersPanel(
                             session: session,
-                            centros: centrosVisibles,
-                            canReserve: true,
-                            canManageAppointments: puedeGestionarCitas,
-                            onReservar: _reservarHorario,
+                            centros: _centros,
+                            canManageAppointments: session.user.canCreateAppointments,
                             onCompletar: _completarCita,
                             onReagendar: _reagendarCita,
                             onCancelar: _cancelarCita,
                             colorEstado: _colorEstado,
+                          ),
+                          const SizedBox(height: 24),
+                          // ─── Gran botón de acción (Depende del rol) ───
+                          SizedBox(
+                            width: double.infinity,
+                            height: 72,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                if (esAdmin) {
+                                  setState(() => _showCreacionCampana = true);
+                                } else if (esVacunador) {
+                                  setState(() => _showRegistroVacuna = true);
+                                } else {
+                                  setState(() => _showPeticionCita = true);
+                                }
+                              },
+                              icon: Icon(
+                                esAdmin 
+                                    ? Icons.add_box 
+                                    : (esVacunador ? Icons.vaccines : Icons.calendar_month_rounded), 
+                                size: 28,
+                              ),
+                              label: Text(
+                                esAdmin 
+                                    ? 'Crear campaña' 
+                                    : (esVacunador ? 'Registrar vacuna' : 'Pedir cita')
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: esAdmin 
+                                    ? const Color(0xFF10B981) // Green for create
+                                    : (esVacunador ? const Color(0xFF374151) : const Color(0xFF00AAFF)),
+                                foregroundColor: Colors.white,
+                                textStyle: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 4,
+                              ),
+                            ),
                           ),
                         ],
                       ],
@@ -937,8 +1244,20 @@ class _AppShellState extends State<AppShell> {
             ),
           ),
         ),
+              ),
+            ),
+          );
+        },
       ),
     );
+  }
+
+  String _getUserInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts.isNotEmpty ? parts[0][0].toUpperCase() : '?';
   }
 }
 
@@ -1059,10 +1378,6 @@ class _PatientProfilePanel extends StatelessWidget {
 
 class _AdminManagementPanel extends StatelessWidget {
   const _AdminManagementPanel({
-    required this.campanaNombreController,
-    required this.campanaDescripcionController,
-    required this.campanaInicioController,
-    required this.campanaFinController,
     required this.centroNombreController,
     required this.centroTipoController,
     required this.centroDireccionController,
@@ -1077,15 +1392,12 @@ class _AdminManagementPanel extends StatelessWidget {
     required this.selectedCentroId,
     required this.onCampanaSelected,
     required this.onCentroSelected,
-    required this.onCrearCampana,
     required this.onCrearCentro,
     required this.onVincular,
+    required this.resendApiKeyController,
+    required this.onUpdateApiKey,
   });
 
-  final TextEditingController campanaNombreController;
-  final TextEditingController campanaDescripcionController;
-  final TextEditingController campanaInicioController;
-  final TextEditingController campanaFinController;
   final TextEditingController centroNombreController;
   final TextEditingController centroTipoController;
   final TextEditingController centroDireccionController;
@@ -1100,9 +1412,10 @@ class _AdminManagementPanel extends StatelessWidget {
   final int? selectedCentroId;
   final ValueChanged<int?> onCampanaSelected;
   final ValueChanged<int?> onCentroSelected;
-  final VoidCallback onCrearCampana;
   final VoidCallback onCrearCentro;
   final VoidCallback onVincular;
+  final TextEditingController resendApiKeyController;
+  final VoidCallback onUpdateApiKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1111,45 +1424,21 @@ class _AdminManagementPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Crear campaña', style: Theme.of(context).textTheme.titleMedium),
+          Text('Configuración API de Notificaciones (Resend)', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: TextField(
-                  controller: campanaNombreController,
-                  decoration: const InputDecoration(labelText: 'Nombre'),
+                  controller: resendApiKeyController,
+                  decoration: const InputDecoration(labelText: 'Ingresa tu API Key (re_...)'),
+                  obscureText: true,
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: campanaDescripcionController,
-                  decoration: const InputDecoration(labelText: 'Descripcion'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: campanaInicioController,
-                  decoration: const InputDecoration(labelText: 'Fecha inicio'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: campanaFinController,
-                  decoration: const InputDecoration(labelText: 'Fecha fin'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton(
-                onPressed: onCrearCampana,
-                child: const Text('Crear campaña'),
+              FilledButton.tonal(
+                onPressed: onUpdateApiKey,
+                child: const Text('Actualizar'),
               ),
             ],
           ),
@@ -1277,9 +1566,11 @@ class _AdminManagementPanel extends StatelessWidget {
 }
 
 class _CampaignsPanel extends StatelessWidget {
-  const _CampaignsPanel({required this.campanas});
+  const _CampaignsPanel({required this.campanas, required this.onTerminarCampana, required this.esAdmin});
 
   final List<Campana> campanas;
+  final ValueChanged<Campana> onTerminarCampana;
+  final bool esAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -1294,8 +1585,12 @@ class _CampaignsPanel extends StatelessWidget {
                   .map(
                     (campana) => Chip(
                       label: Text(
-                        '#${campana.id} ${campana.nombre} | Centros: ${campana.centros.length} | Vacunaciones: ${campana.vacunaciones.length}',
+                        '#${campana.id} ${campana.nombre} | Centros: ${campana.centros.length} | Estado: ${campana.estado}',
                       ),
+                      backgroundColor: campana.estado == 'TERMINADA' ? Colors.grey[300] : null,
+                      onDeleted: (!esAdmin || campana.estado == 'TERMINADA')
+                          ? null 
+                          : () => onTerminarCampana(campana),
                     ),
                   )
                   .toList(),
@@ -1308,9 +1603,7 @@ class _CentersPanel extends StatelessWidget {
   const _CentersPanel({
     required this.session,
     required this.centros,
-    required this.canReserve,
     required this.canManageAppointments,
-    required this.onReservar,
     required this.onCompletar,
     required this.onReagendar,
     required this.onCancelar,
@@ -1319,10 +1612,7 @@ class _CentersPanel extends StatelessWidget {
 
   final Session? session;
   final List<CentroVacunacion> centros;
-  final bool canReserve;
   final bool canManageAppointments;
-  final Future<void> Function(CentroVacunacion centro, String horario)
-  onReservar;
   final Future<void> Function(CentroVacunacion centro, Cita cita) onCompletar;
   final Future<void> Function(CentroVacunacion centro, Cita cita) onReagendar;
   final Future<void> Function(CentroVacunacion centro, Cita cita) onCancelar;
@@ -1331,16 +1621,14 @@ class _CentersPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SectionCard(
-      title: 'Centros de vacunacion y horarios',
+      title: 'Centros de vacunacion y citas',
       child: Column(
         children: centros
             .map(
               (centro) => _CenterCard(
                 session: session,
                 centro: centro,
-                canReserve: canReserve,
                 canManageAppointments: canManageAppointments,
-                onReservar: onReservar,
                 onCompletar: onCompletar,
                 onReagendar: onReagendar,
                 onCancelar: onCancelar,
@@ -1357,9 +1645,7 @@ class _CenterCard extends StatelessWidget {
   const _CenterCard({
     required this.session,
     required this.centro,
-    required this.canReserve,
     required this.canManageAppointments,
-    required this.onReservar,
     required this.onCompletar,
     required this.onReagendar,
     required this.onCancelar,
@@ -1368,10 +1654,7 @@ class _CenterCard extends StatelessWidget {
 
   final Session? session;
   final CentroVacunacion centro;
-  final bool canReserve;
   final bool canManageAppointments;
-  final Future<void> Function(CentroVacunacion centro, String horario)
-  onReservar;
   final Future<void> Function(CentroVacunacion centro, Cita cita) onCompletar;
   final Future<void> Function(CentroVacunacion centro, Cita cita) onReagendar;
   final Future<void> Function(CentroVacunacion centro, Cita cita) onCancelar;
@@ -1401,6 +1684,13 @@ class _CenterCard extends StatelessWidget {
         cita.estado != CitaEstado.cancelada;
   }
 
+  bool _puedeReagendar(Cita cita) {
+    if (cita.estado == CitaEstado.completada || cita.estado == CitaEstado.cancelada) {
+      return false;
+    }
+    return canManageAppointments || _puedeCancelar(cita);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1408,9 +1698,9 @@ class _CenterCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FFFE),
+        color: const Color(0xFFF5FAFF),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFDCFCE7)),
+        border: Border.all(color: const Color(0xFFD0E8FF)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1435,7 +1725,7 @@ class _CenterCard extends StatelessWidget {
                 ),
               ),
               Text(
-                'Disponibles: ${centro.horariosDisponibles.length} | Reservadas: ${centro.citasReservadas.length} | Reagendadas: ${centro.citasReagendadas.length} | Completadas: ${centro.citasCompletadas.length} | Canceladas: ${centro.citasCanceladas.length}',
+                'Reservadas: ${centro.citasReservadas.length} | Completadas: ${centro.citasCompletadas.length} | Canceladas: ${centro.citasCanceladas.length}',
                 textAlign: TextAlign.right,
               ),
             ],
@@ -1456,29 +1746,6 @@ class _CenterCard extends StatelessWidget {
                       )
                       .toList(),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Horarios disponibles',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          if (centro.horariosDisponibles.isEmpty)
-            const Text('No hay horarios disponibles en este centro.')
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: centro.horariosDisponibles
-                  .map(
-                    (horario) => ActionChip(
-                      label: Text(horario),
-                      onPressed: canReserve
-                          ? () => onReservar(centro, horario)
-                          : null,
-                    ),
-                  )
-                  .toList(),
-            ),
           const Divider(height: 28),
           Text(
             'Citas del centro',
@@ -1515,7 +1782,7 @@ class _CenterCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Cita #${cita.id} - ${cita.fechaHora}'),
+                          Text('Cita #${cita.id} - ${cita.fecha != null ? '${cita.fecha} ' : ''}${cita.fechaHora}'),
                           const SizedBox(height: 4),
                           Text(
                             'Estado: ${cita.estado.label} | Paciente: ${_nombreVisible(cita)}',
@@ -1533,9 +1800,7 @@ class _CenterCard extends StatelessWidget {
                             onPressed: () => onCompletar(centro, cita),
                             child: const Text('Completar'),
                           ),
-                        if (canManageAppointments &&
-                            cita.estado != CitaEstado.completada &&
-                            cita.estado != CitaEstado.cancelada)
+                        if (_puedeReagendar(cita))
                           OutlinedButton(
                             onPressed: () => onReagendar(centro, cita),
                             child: const Text('Reagendar'),
@@ -1721,7 +1986,7 @@ class _SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: const Color(0xFFD0E8FF)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

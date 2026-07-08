@@ -15,12 +15,16 @@ class AppUser {
     required this.password,
     required this.fullName,
     required this.role,
+    this.centrosIds = const [],
+    this.campanasIds = const [],
   });
 
   final String email;
   final String password;
   final String fullName;
   final AppRole role;
+  final List<int> centrosIds;
+  final List<int> campanasIds;
 
   bool get canCreateAppointments =>
       role == AppRole.admin || role == AppRole.operador;
@@ -50,23 +54,43 @@ class AuthService {
           password: '123456',
           fullName: 'Administrador Sistema',
           role: AppRole.admin,
+          centrosIds: [1, 2],
+          campanasIds: [1, 2],
         ),
         AppUser(
           email: 'operador@demo.cl',
           password: '123456',
           fullName: 'Operador Central',
           role: AppRole.operador,
+          centrosIds: [1, 2],
+          campanasIds: [1, 2],
         ),
         AppUser(
           email: 'vacunador@demo.cl',
           password: '123456',
           fullName: 'Vacunador Equipo',
           role: AppRole.vacunador,
+          centrosIds: [1],
+          campanasIds: [1],
+        ),
+        AppUser(
+          email: 'vacunador2@demo.cl',
+          password: '123456',
+          fullName: 'Vacunador Sur',
+          role: AppRole.vacunador,
+          centrosIds: [2],
+          campanasIds: [2],
         ),
         AppUser(
           email: 'paciente@demo.cl',
           password: '123456',
           fullName: 'Paciente Demo',
+          role: AppRole.paciente,
+        ),
+        AppUser(
+          email: 'alfonsogg111@gmail.com',
+          password: '123456',
+          fullName: 'Gustavo Riquelme',
           role: AppRole.paciente,
         ),
       ];

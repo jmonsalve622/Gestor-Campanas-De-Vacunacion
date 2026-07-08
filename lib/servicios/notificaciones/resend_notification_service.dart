@@ -1,15 +1,23 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../modelos/Persona.dart';
 import '../../modelos/cita.dart';
 import 'notification_service.dart';
 
 class ResendNotificationService implements NotificationService {
-  const ResendNotificationService();
+  ResendNotificationService();
 
-  String? get _apiKey => Platform.environment['RESEND_API_KEY'];
+  String? dynamicApiKey;
+
+  String? get _apiKey {
+    if (dynamicApiKey != null && dynamicApiKey!.isNotEmpty) {
+      return dynamicApiKey;
+    }
+    // Clave de API inyectada directamente para pruebas
+    return '[ENCRYPTION_KEY]';
+  }
 
   @override
   Future<void> sendReservationConfirmation({
@@ -113,26 +121,29 @@ class ResendNotificationService implements NotificationService {
     }
 
     final uri = Uri.parse('https://api.resend.com/emails');
-    final request = await HttpClient().postUrl(uri);
-    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $apiKey');
-    request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-    request.write(
-      jsonEncode({
-        'from': from,
-        'to': [to],
-        'subject': subject,
-        'html': html,
-      }),
-    );
-
-    final response = await request.close();
-    final responseBody = await response.transform(utf8.decoder).join();
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw HttpException(
-        'Resend respondio con ${response.statusCode}: $responseBody',
-        uri: uri,
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'from': from,
+          'to': [to],
+          'subject': subject,
+          'html': html,
+        }),
       );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception(
+          'Resend respondio con ${response.statusCode}: ${response.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error enviando email via Resend: $e');
+      rethrow;
     }
   }
 }
