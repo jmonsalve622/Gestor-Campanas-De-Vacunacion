@@ -12,6 +12,8 @@ import '../servicios/notificaciones/notification_service.dart';
 import '../servicios/notificaciones/resend_notification_service.dart';
 import 'peticion_cita_page.dart';
 import 'registro_vacuna_page.dart';
+import 'registro_vacunador_page.dart';
+import 'registro_operador_page.dart';
 import 'creacion_campana_page.dart';
 
 class GestorCampanasApp extends StatelessWidget {
@@ -107,6 +109,9 @@ class _AppShellState extends State<AppShell> {
       TextEditingController(text: '123456');
   final TextEditingController _resendApiKeyController =
       TextEditingController();
+  final TextEditingController _vacEmailController = TextEditingController();
+  final TextEditingController _vacPasswordController = TextEditingController();
+  final TextEditingController _vacFullNameController = TextEditingController();
 
   int? _selectedLinkCampanaId;
   int? _selectedLinkCentroId;
@@ -120,6 +125,8 @@ class _AppShellState extends State<AppShell> {
   bool _showPeticionCita = false;
   bool _showRegistroVacuna = false;
   bool _showCreacionCampana = false;
+  bool _showRegistroOperador = false;
+  bool _showRegistroVacunador = false;
   Timer? _reminderTimer;
 
   @override
@@ -138,6 +145,9 @@ class _AppShellState extends State<AppShell> {
     _loginEmailController.dispose();
     _loginPasswordController.dispose();
     _resendApiKeyController.dispose();
+    _vacEmailController.dispose();
+    _vacPasswordController.dispose();
+    _vacFullNameController.dispose();
     _pacienteRutController.dispose();
     _pacienteNombresController.dispose();
     _pacienteApellidosController.dispose();
@@ -493,6 +503,62 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _status =
           'Centro ${centro.nombre} vinculado a la campaña ${campana.nombre}.';
+    });
+  }
+
+  void _asignarVacunadorExistente(AppUser vacunador) {
+    final session = _authService.requireSession();
+    final centroId = session.user.centrosIds.isNotEmpty ? session.user.centrosIds.first : 1;
+    final campanaId = session.user.campanasIds.isNotEmpty ? session.user.campanasIds.first : 1;
+    
+    _authService.assignVaccinatorToCenter(vacunador, centroId, campanaId);
+    setState(() {
+      _status = 'Vacunador ${vacunador.fullName} asignado exitosamente al centro.';
+    });
+  }
+
+  Future<void> _registrarVacunador(String rut, String fullName, String email, String password) async {
+    final session = _authService.requireSession();
+    if (session.user.role != AppRole.operador) {
+      throw StateError('Solo el operador puede registrar vacunadores.');
+    }
+
+    _authService.registerVaccinator(
+      rut: rut,
+      email: email,
+      password: password,
+      fullName: fullName,
+      centrosIds: session.user.centrosIds,
+      campanasIds: session.user.campanasIds,
+    );
+    setState(() {
+      _status = 'Vacunador $fullName registrado exitosamente.';
+    });
+  }
+
+  void _asignarOperadorExistente(AppUser operador, int centroId, int campanaId) {
+    _authService.assignOperatorToCenter(operador, centroId, campanaId);
+    setState(() {
+      _status = 'Operador asignado exitosamente al centro $centroId.';
+    });
+  }
+
+  Future<void> _registrarOperador(String rut, String fullName, String email, String password, int centroId, int campanaId) async {
+    final session = _authService.requireSession();
+    if (session.user.role != AppRole.admin) {
+      throw StateError('Solo el administrador puede registrar operadores.');
+    }
+
+    _authService.registerOperator(
+      rut: rut,
+      email: email,
+      password: password,
+      fullName: fullName,
+      centrosIds: [centroId],
+      campanasIds: [campanaId],
+    );
+    setState(() {
+      _status = 'Operador $fullName registrado exitosamente.';
     });
   }
 
@@ -881,6 +947,7 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final session = _authService.currentSession;
     final esAdmin = session?.user.role == AppRole.admin;
+    final esOperador = session?.user.role == AppRole.operador;
     final puedeGestionarCitas =
         session?.user.canRegisterVaccinations == true ||
         session?.user.canCreateAppointments == true;
@@ -921,6 +988,39 @@ class _AppShellState extends State<AppShell> {
         onRegistrar: _registrarVacunacion,
         onBack: esVacunador ? null : () => setState(() => _showRegistroVacuna = false),
         onLogout: esVacunador ? _logout : null,
+      );
+    }
+
+    // ─── Vista de Registro de Vacunador (Operador) ───
+    if (session != null && esOperador) {
+      // Filtrar vacunadores que aún no están en el centro del operador
+      final operadorCentroId = session.user.centrosIds.isNotEmpty ? session.user.centrosIds.first : -1;
+      final vacunadoresDisponibles = _authService.vaccinators
+          .where((v) => !v.centrosIds.contains(operadorCentroId))
+          .toList();
+      final centro = _centros.firstWhere((c) => c.id == operadorCentroId, orElse: () => CentroVacunacion(id: -1, nombre: 'Sin Asignar', tipo: '', direccion: '', comuna: '', region: ''));
+
+      return RegistroVacunadorPage(
+        operadorName: session.user.fullName,
+        centroName: centro.nombre,
+        vacunadoresDisponibles: vacunadoresDisponibles,
+        onAsignarExistente: _asignarVacunadorExistente,
+        onCrearNuevo: _registrarVacunador,
+        onLogout: _logout,
+      );
+    }
+
+    // ─── Vista de Registro de Operador (Admin) ───
+    if (_showRegistroOperador && session != null && esAdmin) {
+      final operadoresDisponibles = _authService.operators; // Or filter if needed
+      return RegistroOperadorPage(
+        adminName: session.user.fullName,
+        centros: _centros,
+        campanas: _campanas,
+        operadoresDisponibles: operadoresDisponibles,
+        onAsignarExistente: _asignarOperadorExistente,
+        onCrearNuevo: _registrarOperador,
+        onBack: () => setState(() => _showRegistroOperador = false),
       );
     }
 
@@ -1171,70 +1271,113 @@ class _AppShellState extends State<AppShell> {
                               onRegistrarPaciente: _registrarPaciente,
                             ),
                           ],
-                          const SizedBox(height: 16),
-                          _CampaignsPanel(
-                            campanas: _campanas,
-                            esAdmin: esAdmin,
-                            onTerminarCampana: (campana) {
-                              setState(() {
-                                campana.estado = 'TERMINADA';
-                                _status = 'Campaña ${campana.nombre} terminada.';
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          _CentersPanel(
-                            session: session,
-                            centros: _centros,
-                            canManageAppointments: session.user.canCreateAppointments,
-                            onCompletar: _completarCita,
-                            onReagendar: _reagendarCita,
-                            onCancelar: _cancelarCita,
-                            colorEstado: _colorEstado,
-                          ),
-                          const SizedBox(height: 24),
-                          // ─── Gran botón de acción (Depende del rol) ───
-                          SizedBox(
-                            width: double.infinity,
-                            height: 72,
-                            child: FilledButton.icon(
-                              onPressed: () {
-                                if (esAdmin) {
-                                  setState(() => _showCreacionCampana = true);
-                                } else if (esVacunador) {
-                                  setState(() => _showRegistroVacuna = true);
-                                } else {
-                                  setState(() => _showPeticionCita = true);
-                                }
+                          if (!esOperador) ...[
+                            const SizedBox(height: 16),
+                            _CampaignsPanel(
+                              campanas: _campanas,
+                              esAdmin: esAdmin,
+                              onTerminarCampana: (campana) {
+                                setState(() {
+                                  campana.estado = 'TERMINADA';
+                                  _status = 'Campaña ${campana.nombre} terminada.';
+                                });
                               },
-                              icon: Icon(
-                                esAdmin 
-                                    ? Icons.add_box 
-                                    : (esVacunador ? Icons.vaccines : Icons.calendar_month_rounded), 
-                                size: 28,
-                              ),
-                              label: Text(
-                                esAdmin 
-                                    ? 'Crear campaña' 
-                                    : (esVacunador ? 'Registrar vacuna' : 'Pedir cita')
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: esAdmin 
-                                    ? const Color(0xFF10B981) // Green for create
-                                    : (esVacunador ? const Color(0xFF374151) : const Color(0xFF00AAFF)),
-                                foregroundColor: Colors.white,
-                                textStyle: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
+                            ),
+                          ],
+                          if (!esOperador) ...[
+                            const SizedBox(height: 16),
+                            _CentersPanel(
+                              session: session,
+                              centros: _centros,
+                              canManageAppointments: session.user.canCreateAppointments,
+                              onCompletar: _completarCita,
+                              onReagendar: _reagendarCita,
+                              onCancelar: _cancelarCita,
+                              colorEstado: _colorEstado,
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          // ─── Botones de acción (Depende del rol) ───
+                          if (esAdmin)
+                            Column(
+                              children: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 72,
+                                  child: FilledButton.icon(
+                                    onPressed: () => setState(() => _showCreacionCampana = true),
+                                    icon: const Icon(Icons.add_box, size: 28),
+                                    label: const Text('Crear campaña'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
+                                      textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      elevation: 4,
+                                    ),
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 72,
+                                  child: FilledButton.icon(
+                                    onPressed: () => setState(() => _showRegistroOperador = true),
+                                    icon: const Icon(Icons.manage_accounts, size: 28),
+                                    label: const Text('Gestionar Operadores'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF003322),
+                                      foregroundColor: Colors.white,
+                                      textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      elevation: 4,
+                                    ),
+                                  ),
                                 ),
-                                elevation: 4,
+                              ],
+                            )
+                          else
+                            SizedBox(
+                              width: double.infinity,
+                              height: 72,
+                              child: FilledButton.icon(
+                                onPressed: () {
+                                  if (esVacunador) {
+                                    setState(() => _showRegistroVacuna = true);
+                                  } else if (esOperador) {
+                                    setState(() => _showRegistroVacunador = true);
+                                  } else {
+                                    setState(() => _showPeticionCita = true);
+                                  }
+                                },
+                                icon: Icon(
+                                  esVacunador 
+                                      ? Icons.vaccines 
+                                      : (esOperador ? Icons.person_add : Icons.calendar_month_rounded), 
+                                  size: 28,
+                                ),
+                                label: Text(
+                                  esVacunador 
+                                      ? 'Registrar vacuna' 
+                                      : (esOperador ? 'Agregar vacunador' : 'Pedir cita')
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: esVacunador 
+                                      ? const Color(0xFF374151) 
+                                      : (esOperador ? const Color(0xFF8B5CF6) : const Color(0xFF00AAFF)),
+                                  foregroundColor: Colors.white,
+                                  textStyle: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 4,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ],
                     ),
