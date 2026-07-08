@@ -325,9 +325,9 @@ class _AppShellState extends State<AppShell> {
         _status =
             'Sesion iniciada como ${session.user.fullName} (${session.user.role.label}).';
       });
-    } catch (error) {
+    } on StateError catch (error) {
       setState(() {
-        _status = 'No se pudo iniciar sesion. Verifica tus credenciales.';
+        _status = error.message;
       });
     }
   }
