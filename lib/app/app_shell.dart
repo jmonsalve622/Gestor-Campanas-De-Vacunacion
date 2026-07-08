@@ -224,10 +224,10 @@ class _AppShellState extends State<AppShell> {
 
     final pacienteDemo = Persona(
       rut: '21.343.419-5',
-      nombres: 'Gustavo',
-      apellidos: 'Riquelme',
+      nombres: 'Alfonso',
+      apellidos: 'Gonzalez',
       fechaNacimiento: DateTime(1990, 1, 1),
-      correo: 'jpedreros2024@udec.cl',
+      correo: 'alfonsogg111@gmail.com',
       telefono: '+56912345678',
     );
 
@@ -663,27 +663,51 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  Future<String?> _pedirNuevoHorario(String horarioActual) async {
-    TimeOfDay initialTime = TimeOfDay.now();
-    try {
-      final parts = horarioActual.split(':');
-      if (parts.length == 2) {
-        initialTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  Future<String?> _pedirNuevoHorario(CentroVacunacion centro, String? fecha) async {
+    final horariosDisponibles = fecha != null 
+        ? centro.horariosDisponiblesPorFecha(fecha)
+        : centro.horariosDisponibles;
+
+    if (horariosDisponibles.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No hay horarios disponibles para reagendar.')),
+        );
       }
-    } catch (_) {}
-
-    final TimeOfDay? newTime = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-      helpText: 'Seleccionar nuevo horario para reagendar',
-    );
-
-    if (newTime != null) {
-      final hh = newTime.hour.toString().padLeft(2, '0');
-      final mm = newTime.minute.toString().padLeft(2, '0');
-      return '$hh:$mm';
+      return null;
     }
-    return null;
+
+    return await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reagendar Cita'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Selecciona un nuevo horario:'),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: horariosDisponibles.map((h) {
+                  return ActionChip(
+                    label: Text(h),
+                    onPressed: () => Navigator.of(context).pop(h),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _reagendarCita(CentroVacunacion centro, Cita cita) async {
@@ -698,7 +722,7 @@ class _AppShellState extends State<AppShell> {
       return;
     }
 
-    final nuevoHorario = await _pedirNuevoHorario(cita.fechaHora);
+    final nuevoHorario = await _pedirNuevoHorario(centro, cita.fecha);
     if (nuevoHorario == null || nuevoHorario.isEmpty) {
       return;
     }
@@ -994,11 +1018,14 @@ class _AppShellState extends State<AppShell> {
         ? _centros 
         : centrosAsignados;
 
-    final userCampanasIds = session?.user.campanasIds ?? [];
-    final campanasAsignadas = _campanas.where((c) => userCampanasIds.contains(c.id)).toList();
-    final campanasParaRegistro = (campanasAsignadas.isEmpty && session?.user.role == AppRole.admin)
+    // Obtener las campañas que están vinculadas a los centros asignados al usuario
+    final campanasVinculadasACentros = _campanas.where((campana) {
+      return campana.centros.any((centro) => userCentrosIds.contains(centro.id));
+    }).toList();
+    
+    final campanasParaRegistro = (campanasVinculadasACentros.isEmpty && session?.user.role == AppRole.admin)
         ? _campanas
-        : campanasAsignadas;
+        : campanasVinculadasACentros;
 
     // ─── Vista de Registro de Vacuna ───
     if (session != null && (esVacunador || (_showRegistroVacuna && puedeGestionarCitas))) {
