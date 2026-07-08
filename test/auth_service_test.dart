@@ -42,8 +42,6 @@ void main() {
         );
       }
 
-      // El 6to intento, aunque la password sea correcta, debe rechazar
-      // por el bloqueo temporal, no por credenciales.
       expect(
         () => auth.login(email: 'admin@demo.cl', password: '123456'),
         throwsA(
@@ -90,12 +88,13 @@ void main() {
         email: 'nuevo@demo.cl',
         password: 'clave123',
         fullName: 'Nuevo Paciente',
+        rut: '15.111.222-3',
       );
 
       expect(paciente.role, AppRole.paciente);
-      // La sesión de ese paciente debe poder loguearse con la password que puso.
       final session = auth.login(email: 'nuevo@demo.cl', password: 'clave123');
       expect(session.user.email, 'nuevo@demo.cl');
+      expect(session.user.rut, '15.111.222-3');
     });
 
     test('no permite registrar un correo ya existente', () {
@@ -114,6 +113,7 @@ void main() {
   group('SecurityController - RBAC', () {
     late String tokenPaciente;
     late String tokenAdmin;
+    late String tokenVacunador;
 
     setUp(() {
       final auth = AuthService();
@@ -121,6 +121,9 @@ void main() {
           .login(email: 'paciente@demo.cl', password: '123456')
           .token;
       tokenAdmin = auth.login(email: 'admin@demo.cl', password: '123456').token;
+      tokenVacunador = auth
+          .login(email: 'vacunador@demo.cl', password: '123456')
+          .token;
     });
 
     test('verificarRol permite si el rol está en la lista', () {
@@ -146,7 +149,7 @@ void main() {
       expect(
         () => SecurityController.verificarPropiedadPaciente(
           payload,
-          '99.999.999-9', // RUT distinto al del paciente logueado
+          '99.999.999-9',
         ),
         throwsA(isA<AccesoDenegadoException>()),
       );
@@ -167,6 +170,56 @@ void main() {
         throwsA(
           isA<AccesoDenegadoException>().having((e) => e.codigo, 'codigo', 401),
         ),
+      );
+    });
+
+    // --- Nuevos: control fino por centro (vacunador/coordinador) ---
+
+    test('vacunador puede operar sobre su propio centro (id 1)', () {
+      final payload = SecurityController.validarToken(tokenVacunador);
+      expect(
+        () => SecurityController.verificarPropiedadCentro(
+          payload,
+          centroIdRecurso: 1,
+          centroIdAsignado: 1, // el vacunador demo tiene centroAsignadoId: 1
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('vacunador NO puede operar sobre un centro distinto (id 2)', () {
+      final payload = SecurityController.validarToken(tokenVacunador);
+      expect(
+        () => SecurityController.verificarPropiedadCentro(
+          payload,
+          centroIdRecurso: 2,
+          centroIdAsignado: 1,
+        ),
+        throwsA(isA<AccesoDenegadoException>()),
+      );
+    });
+
+    test('admin no está restringido por centro (bypass)', () {
+      final payload = SecurityController.validarToken(tokenAdmin);
+      expect(
+        () => SecurityController.verificarPropiedadCentro(
+          payload,
+          centroIdRecurso: 2,
+          centroIdAsignado: null, // el admin no tiene centro asignado
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('paciente no está sujeto al control de centro', () {
+      final payload = SecurityController.validarToken(tokenPaciente);
+      expect(
+        () => SecurityController.verificarPropiedadCentro(
+          payload,
+          centroIdRecurso: 2,
+          centroIdAsignado: null,
+        ),
+        returnsNormally, // la regla solo aplica a vacunador/coordinador
       );
     });
   });

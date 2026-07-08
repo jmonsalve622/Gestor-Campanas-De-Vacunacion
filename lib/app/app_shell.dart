@@ -8,6 +8,7 @@ import '../modelos/vacunacion.dart';
 import '../servicios/auth/auth_service.dart';
 import '../servicios/notificaciones/notification_service.dart';
 import '../servicios/notificaciones/resend_notification_service.dart';
+import '../servicios/seguridad/security_controller.dart';
 
 class GestorCampanasApp extends StatelessWidget {
   const GestorCampanasApp({super.key});
@@ -341,9 +342,11 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _crearCampana() async {
     final session = _authService.requireSession();
-    if (session.user.role != AppRole.admin) {
+    try {
+      SecurityController.verificarRol(session.payload, ['admin']);
+    } on AccesoDenegadoException catch (e) {
       setState(() {
-        _status = 'Solo el admin puede crear campañas.';
+        _status = e.mensaje;
       });
       return;
     }
@@ -380,9 +383,11 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _crearCentro() async {
     final session = _authService.requireSession();
-    if (session.user.role != AppRole.admin) {
+    try {
+      SecurityController.verificarRol(session.payload, ['admin']);
+    } on AccesoDenegadoException catch (e) {
       setState(() {
-        _status = 'Solo el admin puede crear centros.';
+        _status = e.mensaje;
       });
       return;
     }
@@ -425,9 +430,11 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _vincularCentroACampana() async {
     final session = _authService.requireSession();
-    if (session.user.role != AppRole.admin) {
+    try {
+      SecurityController.verificarRol(session.payload, ['admin']);
+    } on AccesoDenegadoException catch (e) {
       setState(() {
-        _status = 'Solo el admin puede vincular centros con campañas.';
+        _status = e.mensaje;
       });
       return;
     }
@@ -450,9 +457,11 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _registrarPaciente() async {
     final session = _authService.requireSession();
-    if (session.user.role != AppRole.admin) {
+    try {
+      SecurityController.verificarRol(session.payload, ['admin']);
+    } on AccesoDenegadoException catch (e) {
       setState(() {
-        _status = 'Solo el admin puede registrar pacientes.';
+        _status = e.mensaje;
       });
       return;
     }
@@ -462,6 +471,7 @@ class _AppShellState extends State<AppShell> {
             .trim();
     final email = _pacienteCorreoController.text.trim();
     final password = _registroPacientePasswordController.text;
+    final rut = _pacienteRutController.text.trim();
 
     if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
       setState(() {
@@ -471,10 +481,14 @@ class _AppShellState extends State<AppShell> {
     }
 
     try {
+      // Se pasa el RUT explícitamente: si no, el AppUser quedaba con RUT
+      // vacío y el control fino "verificarPropiedadPaciente" nunca iba a
+      // coincidir con el RUT real de sus citas.
       _authService.registerPatient(
         email: email,
         password: password,
         fullName: fullName,
+        rut: rut,
       );
       final persona = _crearPersonaPaciente();
       _pacientesRegistrados[email.toLowerCase()] = persona;
@@ -552,9 +566,19 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _reagendarCita(CentroVacunacion centro, Cita cita) async {
     final session = _authService.requireSession();
-    if (!session.user.canCreateAppointments) {
+    try {
+      final payload = session.payload;
+      // Admin y coordinador pueden reagendar (equivalente al "operador"
+      // original). El coordinador además debe ser dueño del centro.
+      SecurityController.verificarRol(payload, ['admin', 'coordinador']);
+      SecurityController.verificarPropiedadCentro(
+        payload,
+        centroIdRecurso: centro.id,
+        centroIdAsignado: session.user.centroAsignadoId,
+      );
+    } on AccesoDenegadoException catch (e) {
       setState(() {
-        _status = 'El rol ${session.user.role.label} no puede reagendar citas.';
+        _status = e.mensaje;
       });
       return;
     }
@@ -597,12 +621,34 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _cancelarCita(CentroVacunacion centro, Cita cita) async {
     final session = _authService.requireSession();
-    final esPaciente = session.user.role == AppRole.paciente;
-    final esPropia = cita.pacienteCorreo == session.user.email;
+    final payload = session.payload;
+    final esPaciente = payload.rol == 'paciente';
 
-    if (esPaciente && !esPropia) {
+    try {
+      if (esPaciente) {
+        // Control fino por RUT: un paciente solo puede cancelar sus propias
+        // citas, aunque tenga un token válido.
+        SecurityController.verificarPropiedadPaciente(
+          payload,
+          cita.pacienteRut ?? '',
+        );
+      } else {
+        // Antes cualquier rol logueado (incluso sin permiso) podía cancelar
+        // cualquier cita. Ahora se exige rol de staff + dueño del centro.
+        SecurityController.verificarRol(payload, [
+          'admin',
+          'coordinador',
+          'vacunador',
+        ]);
+        SecurityController.verificarPropiedadCentro(
+          payload,
+          centroIdRecurso: centro.id,
+          centroIdAsignado: session.user.centroAsignadoId,
+        );
+      }
+    } on AccesoDenegadoException catch (e) {
       setState(() {
-        _status = 'Solo puedes cancelar tus propias citas.';
+        _status = e.mensaje;
       });
       return;
     }
@@ -655,10 +701,19 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _completarCita(CentroVacunacion centro, Cita cita) async {
     final session = _authService.requireSession();
-    if (!session.user.canRegisterVaccinations) {
+    try {
+      final payload = session.payload;
+      // Admin y vacunador pueden completar. El vacunador además debe ser
+      // dueño del centro donde ocurre la cita (punto 6 del Esquema).
+      SecurityController.verificarRol(payload, ['admin', 'vacunador']);
+      SecurityController.verificarPropiedadCentro(
+        payload,
+        centroIdRecurso: centro.id,
+        centroIdAsignado: session.user.centroAsignadoId,
+      );
+    } on AccesoDenegadoException catch (e) {
       setState(() {
-        _status =
-            'El rol ${session.user.role.label} no puede registrar vacunaciones.';
+        _status = e.mensaje;
       });
       return;
     }
