@@ -44,6 +44,7 @@ extension CitaEstadoLabel on CitaEstado {
 class Cita {
   int id;
   String fechaHora;
+  String? fecha; // Fecha de la cita (formato 'YYYY-MM-DD')
   CitaEstado estado;
   String? pacienteRut;
   String? pacienteNombre;
@@ -52,11 +53,13 @@ class Cita {
   CentroVacunacion? centroVacunacion;
   Vacunacion? vacunacion;
   List<CitaEvento> historial = [];
+  bool recordatorioEnviado = false; // Flag para saber si ya se envió el recordatorio de 24h
 
   // Constructor principal
   Cita({
     required this.id,
     required this.fechaHora,
+    this.fecha,
     this.estado = CitaEstado.disponible,
     this.pacienteRut,
     this.pacienteNombre,
@@ -112,6 +115,7 @@ class Cita {
   Cita reagendar({
     required int nuevaId,
     required String nuevaFechaHora,
+    String? nuevaFecha,
     String responsable = 'Sistema',
   }) {
     registrarCambioEstado(
@@ -122,6 +126,7 @@ class Cita {
     return Cita(
       id: nuevaId,
       fechaHora: nuevaFechaHora,
+      fecha: nuevaFecha ?? fecha,
       estado: CitaEstado.reservada,
       pacienteRut: pacienteRut,
       pacienteNombre: pacienteNombre,
@@ -161,7 +166,7 @@ class Cita {
 
   @override
   String toString() {
-    // "Cita{id=$id, fechaHora='$fechaHora', estado='$estado', campana=$campana, centroVacunacion=$centroVacunacion, vacunacion=$vacunacion}";
-    return "Cita{id=$id, fechaHora='$fechaHora', estado='${estado.label}', pacienteNombre='$pacienteNombre', centroVacunacion=$centroVacunacion}";
+    final fechaStr = fecha != null ? '$fecha ' : '';
+    return "Cita{id=$id, fecha='$fechaStr$fechaHora', estado='${estado.label}', pacienteNombre='$pacienteNombre', centroVacunacion=$centroVacunacion}";
   }
 }
