@@ -16,7 +16,7 @@ class ResendNotificationService implements NotificationService {
       return dynamicApiKey;
     }
     // Clave de API inyectada directamente para pruebas
-    return 're_ZP5xMS8h_EqQhoxbLgLV2mmYD8SvWRKB4';
+    return '[ENCRYPTION_KEY]';
   }
 
   @override

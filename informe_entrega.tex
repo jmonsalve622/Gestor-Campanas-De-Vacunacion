@@ -1,0 +1,75 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+
+\title{\textbf{Informe de Avance: \\ Sistema Gestor de Campañas de Vacunación}}
+\author{Equipo de Desarrollo}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introducción}
+\subsection{El Problema}
+Históricamente, las campañas de vacunación masivas o estacionales enfrentan desafíos logísticos significativos. La falta de canales de comunicación centralizados genera desinformación en los ciudadanos, lo que se traduce en altas tasas de ausentismo, aglomeraciones innecesarias en los centros de salud y una distribución ineficiente de los recursos médicos. Además, el seguimiento manual o fragmentado del estado de vacunación de cada individuo dificulta medir el progreso real de una campaña y asegurar que la población objetivo reciba sus dosis a tiempo.
+
+\subsection{La Solución}
+La solución a esta problemática radica en implementar un modelo de gestión proactiva, predecible y centrada en la comunicación oportuna. Es fundamental que tanto los centros de salud como los ciudadanos tengan un canal directo para coordinar la demanda y llevar un registro trazable del historial de inmunización. Gracias al desarrollo del presente software gestor, se viabiliza esta solución: la plataforma actúa como el medio que automatiza el agendamiento, sincroniza a los distintos actores (administradores, funcionarios de salud y pacientes) en tiempo real y asegura la asistencia mediante la automatización de notificaciones. De este modo, la tecnología empodera la solución logística, mejorando la cobertura y reduciendo la carga administrativa del personal de salud.
+
+\section{Sistema Funcional con Módulos Integrados}
+La aplicación ha sido desarrollada asegurando una arquitectura cohesionada donde los distintos módulos convergen en una sola plataforma:
+\begin{itemize}
+    \item \textbf{Módulo de Administración:} Permite a los coordinadores (rol Admin) crear nuevas campañas, dar de alta centros de vacunación y configurar los parámetros del sistema (incluyendo la inyección segura de API Keys para notificaciones).
+    \item \textbf{Módulo del Ciudadano:} Permite a los pacientes acceder a su historial de citas, consultar disponibilidad en distintos centros y gestionar sus reservas de forma autónoma.
+    \item \textbf{Módulo del Vacunador (Funcionario):} Una interfaz optimizada para buscar pacientes, revisar sus reservas pendientes y asentar el acto de vacunación de forma ágil en terreno.
+\end{itemize}
+Todos estos módulos operan sobre una estructura de datos centralizada, asegurando que si un ciudadano agenda una cita, el centro de vacunación verá el cupo ocupado instantáneamente.
+
+\section{Flujo Completo e Integración con API de Mensajería}
+El flujo operativo principal ha sido implementado y probado de principio a fin:
+\begin{enumerate}
+    \item \textbf{Reserva:} El paciente inicia sesión, escoge una campaña activa, selecciona un centro, un horario mediante un selector interactivo y confirma la reserva.
+    \item \textbf{Confirmación externa:} Al reservarse, el sistema consume la \textit{API de Resend} enviando un correo electrónico real de confirmación al paciente.
+    \item \textbf{Gestión de la Cita:} El paciente puede reprogramar o cancelar su cita, lo cual desencadena nuevamente flujos de correos notificando los cambios. Además, un temporizador interno simula el envío de recordatorios automáticos 24 horas antes de la cita.
+    \item \textbf{Vacunación:} El funcionario de salud busca al paciente mediante su RUT. El sistema recupera la cita reservada y permite registrar los datos de la vacuna suministrada y observaciones médicas.
+    \item \textbf{Cierre del flujo:} Al registrarse la vacuna, el estado de la cita cambia a "Completada" y el paciente recibe un correo de certificación de su vacuna.
+\end{enumerate}
+
+\section{Autenticación y Seguridad Implementadas}
+Se incorporó un sólido sistema de control de acceso basado en Roles (RBAC - \textit{Role Based Access Control}). 
+A través del servicio de autenticación (\texttt{AuthService}), el sistema es capaz de:
+\begin{itemize}
+    \item Validar credenciales de acceso al momento de hacer \textit{login}.
+    \item Restringir visual y lógicamente la interfaz de usuario. Por ejemplo, los pacientes no pueden acceder a los paneles de creación de campañas, y los administradores tienen su vista limpia de formularios médicos que solo competen al personal vacunador.
+    \item Salvaguardar las acciones directas: los métodos internos validan permisos (\texttt{canRegisterVaccinations}, \texttt{canCreateAppointments}) antes de ejecutar operaciones críticas sobre la base de datos, evitando alteraciones indebidas del estado.
+\end{itemize}
+
+\section{Interfaz Validada de acuerdo a Heurísticas de Usabilidad}
+El diseño de la interfaz ha sido iterado considerando las Heurísticas de Nielsen para garantizar una experiencia fluida, especialmente para el personal de salud que requiere eficiencia:
+\begin{itemize}
+    \item \textbf{Visibilidad del estado del sistema:} Uso de indicadores de colores claros para los estados de las citas (Reservada, Reagendada, Completada, Cancelada) y notificaciones emergentes (\textit{Snackbars}) para informar del éxito o fracaso de las acciones (ej. guardado de vacuna).
+    \item \textbf{Relación entre el sistema y el mundo real:} Se modificaron entradas de texto por selectores intuitivos, como el reemplazo del campo de texto plano por un \textit{TimePicker} interactivo nativo al momento de reagendar citas.
+    \item \textbf{Prevención y recuperación de errores:} Se implementaron bloqueos lógicos en la UI para evitar estados inconsistentes (por ejemplo, evitar crasheos si se intenta acceder a una cita que acaba de ser completada y retirada de la lista de pendientes).
+\end{itemize}
+
+\section{Retroalimentación de la Entrega Anterior}
+Durante este ciclo de desarrollo se resolvieron diversas oportunidades de mejora detectadas en revisiones previas:
+\begin{itemize}
+    \item Se ajustó la lógica de vinculación de perfiles, corrigiendo el problema de duplicación de pacientes al hacer reservas, logrando que el perfil del paciente esté correctamente sincronizado para la vista de los vacunadores.
+    \item Se limpió la pantalla de administración, retirando opciones de registro médico y datos de reservas de pacientes, enfocando el perfil gerencial exclusivamente en labores operativas.
+    \item Se completó el ciclo de notificaciones, añadiendo el disparo de correos de confirmación en el hito final de registro de vacuna.
+\end{itemize}
+
+\section{Entregables}
+\begin{itemize}
+    \item \textbf{Repositorio GitHub:} \url{https://github.com/jmonsalve622/Gestor-Campanas-De-Vacunacion}
+    \item \textbf{Video de ejecución:} [INSERTAR ENLACE AL VIDEO AQUÍ]
+\end{itemize}
+
+\end{document}
