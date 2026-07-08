@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestor_aplicacion/modelos/admin_campana.dart';
 
 import '../modelos/campana.dart';
 import '../modelos/centro_vacunacion.dart';
@@ -8,12 +9,14 @@ class CreacionCampanaPage extends StatefulWidget {
     super.key,
     required this.adminName,
     required this.todosLosCentros,
+    required this.todosLosAdministradores,
     required this.onCrearCampana,
     this.onLogout,
   });
 
   final String adminName;
   final List<CentroVacunacion> todosLosCentros;
+  final List<AdminCampana> todosLosAdministradores;
   final Function(Campana campana, String vacunaNombre, List<String> admins) onCrearCampana;
   final VoidCallback? onLogout;
 
@@ -30,22 +33,34 @@ class _CreacionCampanaPageState extends State<CreacionCampanaPage> {
   DateTime? _fechaInicio;
   DateTime? _fechaFin;
 
-  final List<String> _administradoresRuts = [];
+  final List<AdminCampana> _administradoresAnadidos = [];
   final List<CentroVacunacion> _centrosAnadidos = [];
   CentroVacunacion? _centroSeleccionado;
 
   Future<void> _seleccionarFecha(BuildContext context, bool isInicio) async {
+    final DateTime fechaMinima = isInicio 
+        ? DateTime.now() 
+        : (_fechaInicio ?? DateTime.now());
+
+    final DateTime fechaInicial = isInicio 
+        ? (_fechaInicio ?? DateTime.now()) 
+        : (_fechaFin ?? _fechaInicio ?? DateTime.now());
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
+      initialDate: fechaInicial,
+      firstDate: fechaMinima,
       lastDate: DateTime(2101),
       helpText: isInicio ? 'Seleccionar Fecha de Inicio' : 'Seleccionar Fecha de Fin',
     );
+
     if (picked != null) {
       setState(() {
         if (isInicio) {
           _fechaInicio = picked;
+          if (_fechaFin != null && _fechaFin!.isBefore(_fechaInicio!)) {
+            _fechaFin = null;
+          }
         } else {
           _fechaFin = picked;
         }
@@ -54,12 +69,45 @@ class _CreacionCampanaPageState extends State<CreacionCampanaPage> {
   }
 
   void _anadirAdministrador() {
-    final rut = _adminRutController.text.trim();
-    if (rut.isNotEmpty && !_administradoresRuts.contains(rut)) {
+    final rutIngresado = _adminRutController.text.trim();
+
+    if (rutIngresado.isEmpty) return;
+
+    // Función auxiliar interna para limpiar cualquier RUT (quita puntos, guiones y pasa a minúscula)
+    String limpiarRut(String rut) {
+      return rut.replaceAll('.', '').replaceAll('-', '').toLowerCase();
+    }
+
+    final rutLimpioIngresado = limpiarRut(rutIngresado);
+
+    // A. Evitar que se añada dos veces (comparamos los RUTs limpios)
+    if (_administradoresAnadidos.any((admin) => limpiarRut(admin.rut) == rutLimpioIngresado)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este administrador ya fue añadido.')),
+      );
+      return;
+    }
+
+    // B. Buscar en la lista global (comparamos los RUTs limpios)
+    final resultados = widget.todosLosAdministradores.where((admin) {
+      return limpiarRut(admin.rut) == rutLimpioIngresado;
+    }).toList();
+
+    if (resultados.isNotEmpty) {
+      final adminEncontrado = resultados.first;
+      
       setState(() {
-        _administradoresRuts.add(rut);
+        _administradoresAnadidos.add(adminEncontrado);
         _adminRutController.clear();
       });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Añadido: ${adminEncontrado.nombres}'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El RUT ingresado no corresponde a ningún administrador registrado.'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -106,7 +154,9 @@ class _CreacionCampanaPageState extends State<CreacionCampanaPage> {
       nuevaCampana.agregarCentroVacunacion(centro);
     }
 
-    widget.onCrearCampana(nuevaCampana, vacuna, _administradoresRuts);
+    final rutsParaEnviar = _administradoresAnadidos.map((admin) => admin.rut).toList();
+
+    widget.onCrearCampana(nuevaCampana, vacuna, rutsParaEnviar);
   }
 
   String _formatDate(DateTime date) {
@@ -216,7 +266,7 @@ class _CreacionCampanaPageState extends State<CreacionCampanaPage> {
                               color: Colors.grey[300],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: _administradoresRuts.isEmpty
+                            child: _administradoresAnadidos.isEmpty
                                 ? const Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(16.0),
@@ -228,16 +278,18 @@ class _CreacionCampanaPageState extends State<CreacionCampanaPage> {
                                     ),
                                   )
                                 : ListView.builder(
-                                    itemCount: _administradoresRuts.length,
+                                    itemCount: _administradoresAnadidos.length,
                                     itemBuilder: (context, index) {
-                                      final rut = _administradoresRuts[index];
+                                      final admin = _administradoresAnadidos[index]; 
                                       return ListTile(
-                                        title: Text(rut),
+                                        // 4. Mostramos el nombre bonito en vez de solo el RUT
+                                        title: Text(admin.nombres, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        subtitle: Text('RUT: ${admin.rut}'),
                                         trailing: IconButton(
                                           icon: const Icon(Icons.delete_outline, color: Colors.red),
                                           onPressed: () {
                                             setState(() {
-                                              _administradoresRuts.removeAt(index);
+                                              _administradoresAnadidos.removeAt(index);
                                             });
                                           },
                                         ),

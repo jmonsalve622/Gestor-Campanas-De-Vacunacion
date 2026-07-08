@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:gestor_aplicacion/modelos/admin_campana.dart';
 
 import '../modelos/Persona.dart';
 import '../modelos/campana.dart';
@@ -54,6 +55,7 @@ class _AppShellState extends State<AppShell> {
 
   final List<Campana> _campanas = [];
   final List<CentroVacunacion> _centros = [];
+  final List<AdminCampana> _administradores = [];
   final Map<int, Persona> _personasPorCita = {};
   final Map<String, Persona> _pacientesRegistrados = {};
 
@@ -215,8 +217,22 @@ class _AppShellState extends State<AppShell> {
       nombres: 'Gustavo',
       apellidos: 'Riquelme',
       fechaNacimiento: DateTime(1990, 1, 1),
-      correo: 'alfonsogg111@gmail.com',
+      correo: 'jpedreros2024@udec.cl',
       telefono: '+56912345678',
+    );
+
+    final adminDemo = AdminCampana(
+      rut: '12.345.678-5', 
+      nombres: 'Roberto Carlos', 
+      apellidos: 'Manolas Carroza', 
+      correo: 'robertc@yahoo.cl'
+    );
+
+    final admin1 = AdminCampana(
+      rut: '11.111.111-1', 
+      nombres: 'Ignacio', 
+      apellidos: 'Freire Kant', 
+      correo: 'ignacio@demo.cl'
     );
 
     final citaReservada = centro1.reservarHorario(
@@ -252,6 +268,7 @@ class _AppShellState extends State<AppShell> {
 
     _campanas.addAll([campanaSarampion, campanaInvierno]);
     _centros.addAll([centro1, centro2]);
+    _administradores.addAll([adminDemo, admin1]);
     _pacientesRegistrados[pacienteDemo.correo] = pacienteDemo;
     _linkCampanaController.text = campanaSarampion.id.toString();
     _linkCentroController.text = centro1.id.toString();
@@ -929,6 +946,7 @@ class _AppShellState extends State<AppShell> {
       return CreacionCampanaPage(
         adminName: session.user.fullName,
         todosLosCentros: _centros,
+        todosLosAdministradores: _administradores,
         onCrearCampana: (nuevaCampana, vacunaNombre, admins) {
           setState(() {
             nuevaCampana.id = _nextCampanaId++;
@@ -1197,43 +1215,46 @@ class _AppShellState extends State<AppShell> {
                           SizedBox(
                             width: double.infinity,
                             height: 72,
-                            child: FilledButton.icon(
-                              onPressed: () {
-                                if (esAdmin) {
-                                  setState(() => _showCreacionCampana = true);
-                                } else if (esVacunador) {
-                                  setState(() => _showRegistroVacuna = true);
-                                } else {
-                                  setState(() => _showPeticionCita = true);
-                                }
-                              },
-                              icon: Icon(
-                                esAdmin 
-                                    ? Icons.add_box 
-                                    : (esVacunador ? Icons.vaccines : Icons.calendar_month_rounded), 
-                                size: 28,
-                              ),
-                              label: Text(
-                                esAdmin 
-                                    ? 'Crear campaña' 
-                                    : (esVacunador ? 'Registrar vacuna' : 'Pedir cita')
-                              ),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: esAdmin 
-                                    ? const Color(0xFF10B981) // Green for create
-                                    : (esVacunador ? const Color(0xFF374151) : const Color(0xFF00AAFF)),
-                                foregroundColor: Colors.white,
-                                textStyle: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
+                            child: Flexible(
+                              child: FilledButton.icon(
+                                onPressed: () {
+                                  if (esAdmin) {
+                                    setState(() => _showCreacionCampana = true);
+                                  } else if (esVacunador) {
+                                    setState(() => _showRegistroVacuna = true);
+                                  } else {
+                                    setState(() => _showPeticionCita = true);
+                                  }
+                                },
+                                icon: Icon(
+                                  esAdmin 
+                                      ? Icons.add_box 
+                                      : (esVacunador ? Icons.vaccines : Icons.calendar_month_rounded), 
+                                  size: 28,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                label: Text(
+                                  esAdmin 
+                                      ? 'Crear campaña' 
+                                      : (esVacunador ? 'Registrar vacuna' : 'Pedir cita')
                                 ),
-                                elevation: 4,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: esAdmin 
+                                      ? const Color(0xFF10B981) // Green for create
+                                      : (esVacunador ? const Color(0xFF374151) : const Color(0xFF00AAFF)),
+                                  foregroundColor: Colors.white,
+                                  textStyle: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 4,
+                                ),
                               ),
-                            ),
+                            )
+                            
                           ),
                         ],
                       ],
@@ -1519,11 +1540,15 @@ class _AdminManagementPanel extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: 'Campaña disponible',
                   ),
+                  isExpanded: true,
                   items: campanas
                       .map(
                         (campana) => DropdownMenuItem<int?>(
                           value: campana.id,
-                          child: Text('${campana.id} - ${campana.nombre}'),
+                          child: Text(
+                            '${campana.id} - ${campana.nombre}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
@@ -1537,11 +1562,15 @@ class _AdminManagementPanel extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: 'Centro disponible',
                   ),
+                  isExpanded: true,
                   items: centros
                       .map(
                         (centro) => DropdownMenuItem<int?>(
                           value: centro.id,
-                          child: Text('${centro.id} - ${centro.nombre}'),
+                          child: Text(
+                            '${centro.id} - ${centro.nombre}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
@@ -1724,9 +1753,11 @@ class _CenterCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                'Reservadas: ${centro.citasReservadas.length} | Completadas: ${centro.citasCompletadas.length} | Canceladas: ${centro.citasCanceladas.length}',
-                textAlign: TextAlign.right,
+              Expanded(
+                child: Text(
+                  'Reservadas: ${centro.citasReservadas.length} | Completadas: ${centro.citasCompletadas.length} | Canceladas: ${centro.citasCanceladas.length}',
+                  textAlign: TextAlign.right,
+                ),
               ),
             ],
           ),
