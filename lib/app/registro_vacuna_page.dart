@@ -149,7 +149,7 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
             : null,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 32.0),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1200),
@@ -200,6 +200,7 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
                           if (widget.campanasAsignadas.isNotEmpty) ...[
                             DropdownButtonFormField<Campana>(
                               value: _campanaActual,
+                              isExpanded: true,
                               decoration: InputDecoration(
                                 labelText: 'Campaña Actual',
                                 filled: true,
@@ -212,7 +213,10 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
                               items: widget.campanasAsignadas.map((c) {
                                 return DropdownMenuItem(
                                   value: c,
-                                  child: Text(c.nombre),
+                                  child: Text(
+                                    c.nombre,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 );
                               }).toList(),
                               onChanged: (val) {
@@ -230,6 +234,7 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
                           ],
                           if (widget.centrosAsignados.isNotEmpty) ...[
                             DropdownButtonFormField<CentroVacunacion>(
+                              isExpanded: true,
                               value: _centroActual,
                               decoration: InputDecoration(
                                 labelText: 'Centro de Vacunación Actual',
@@ -243,7 +248,11 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
                               items: widget.centrosAsignados.map((c) {
                                 return DropdownMenuItem(
                                   value: c,
-                                  child: Text(c.nombre),
+                                  child: Text(
+                                    c.nombre,
+                                    overflow: TextOverflow.ellipsis, 
+                                    maxLines: 1,
+                                  ),
                                 );
                               }).toList(),
                               onChanged: (val) {
@@ -328,77 +337,130 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
                     // ─── Columna Derecha: Historial y Nueva Vacuna ───
                     Expanded(
                       flex: 6,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Text(
-                            'Historial de vacunas',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            height: 160,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFD1D5DB),
-                              borderRadius: BorderRadius.circular(8),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Historial de vacunas',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                              textAlign: TextAlign.center,
                             ),
-                            child: _pacienteEncontrado == null
-                                ? const Center(child: Text('Sin datos'))
-                                : SingleChildScrollView(child: _buildHistorial()),
-                          ),
-                          const SizedBox(height: 12),
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Abrir historial completo', style: TextStyle(color: Colors.black54)),
-                              SizedBox(width: 16),
-                              Icon(Icons.arrow_back, size: 16),
-                              SizedBox(width: 8),
-                              Text('1/1'),
-                              SizedBox(width: 8),
-                              Icon(Icons.arrow_forward, size: 16),
-                            ],
-                          ),
-                          const SizedBox(height: 48),
-                          if (_pacienteEncontrado != null) ...[
-                            Builder(
-                              builder: (context) {
-                                final citasPendientes = _pacienteEncontrado!.citas
-                                    .where((c) => c.estado.label == 'RESERVADA' &&
-                                                  c.centroVacunacion?.id == _centroActual?.id &&
-                                                  c.campana?.id == _campanaActual?.id)
-                                    .toList();
-                                
-                                if (citasPendientes.isEmpty) return const SizedBox.shrink();
-
-                                final validCita = citasPendientes.contains(_citaSeleccionada) 
-                                    ? _citaSeleccionada 
-                                    : null;
-
-                                // Si la cita seleccionada ya no es válida, la actualizamos en el siguiente frame
-                                if (_citaSeleccionada != null && validCita == null) {
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    if (mounted) setState(() => _citaSeleccionada = null);
-                                  });
-                                }
-
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Expanded(
-                                      flex: 3,
-                                      child: Text(
-                                        'Seleccionar Cita:',
-                                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                            const SizedBox(height: 16),
+                            Container(
+                              height: 160,
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD1D5DB),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: _pacienteEncontrado == null
+                                  ? const Center(child: Text('Sin datos'))
+                                  : SingleChildScrollView(child: _buildHistorial()),
+                            ),
+                            const SizedBox(height: 12),
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Abrir historial completo', style: TextStyle(color: Colors.black54)),
+                                SizedBox(width: 16),
+                                Icon(Icons.arrow_back, size: 16),
+                                SizedBox(width: 8),
+                                Text('1/1'),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward, size: 16),
+                              ],
+                            ),
+                            const SizedBox(height: 48),
+                            if (_pacienteEncontrado != null) ...[
+                              Builder(
+                                builder: (context) {
+                                  final citasPendientes = _pacienteEncontrado!.citas
+                                      .where((c) => c.estado.label == 'RESERVADA' &&
+                                                    c.centroVacunacion?.id == _centroActual?.id &&
+                                                    c.campana?.id == _campanaActual?.id)
+                                      .toList();
+                                  
+                                  if (citasPendientes.isEmpty) return const SizedBox.shrink();
+                        
+                                  final validCita = citasPendientes.contains(_citaSeleccionada) 
+                                      ? _citaSeleccionada 
+                                      : null;
+                        
+                                  // Si la cita seleccionada ya no es válida, la actualizamos en el siguiente frame
+                                  if (_citaSeleccionada != null && validCita == null) {
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      if (mounted) setState(() => _citaSeleccionada = null);
+                                    });
+                                  }
+                        
+                                  return Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Expanded(
+                                        flex: 3,
+                                        child: Text(
+                                          'Seleccionar Cita:',
+                                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                                        ),
                                       ),
-                                    ),
-                                    Expanded(
-                                      flex: 7,
-                                      child: DropdownButtonFormField<Cita>(
-                                        value: validCita,
+                                      Expanded(
+                                        flex: 7,
+                                        child: DropdownButtonFormField<Cita>(
+                                          isExpanded: true,
+                                          value: validCita,
+                                          decoration: InputDecoration(
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                            ),
+                                          ),
+                                          items: citasPendientes
+                                              .map((cita) => DropdownMenuItem(
+                                                    value: cita,
+                                                    child: Text('ID: ${cita.id} - ${cita.fechaHora} (${cita.campana?.nombre ?? 'General'})'),
+                                                  ))
+                                              .toList(),
+                                          onChanged: (cita) {
+                                            setState(() {
+                                              _citaSeleccionada = cita;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                    'Nueva Vacuna:',
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  flex: 7,
+                                  child: Column(
+                                    children: [
+                                      TextField(
+                                        controller: _vacunaController,
                                         decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: 'Ej: Vacuna triple vírica',
                                           filled: true,
                                           fillColor: Colors.white,
                                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -411,116 +473,69 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
                                             borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                                           ),
                                         ),
-                                        items: citasPendientes
-                                            .map((cita) => DropdownMenuItem(
-                                                  value: cita,
-                                                  child: Text('ID: ${cita.id} - ${cita.fechaHora} (${cita.campana?.nombre ?? 'General'})'),
-                                                ))
-                                            .toList(),
-                                        onChanged: (cita) {
-                                          setState(() {
-                                            _citaSeleccionada = cita;
-                                          });
-                                        },
                                       ),
-                                    ),
-                                  ],
-                                );
-                              }
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 24),
-                          ],
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Expanded(
-                                flex: 3,
-                                child: Text(
-                                  'Nueva Vacuna:',
-                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                    'Observaciones:',
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                                  ),
                                 ),
-                              ),
-                              Expanded(
-                                flex: 7,
-                                child: Column(
-                                  children: [
-                                    TextField(
-                                      controller: _vacunaController,
-                                      decoration: InputDecoration(
-                                        hintText: 'Ej: Vacuna triple vírica',
-                                        filled: true,
-                                        fillColor: Colors.white,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                                        ),
+                                Expanded(
+                                  flex: 7,
+                                  child: TextField(
+                                    controller: _observacionesController,
+                                    maxLines: 3,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      hintText: 'Añadir observaciones relevantes...',
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Expanded(
-                                flex: 3,
-                                child: Text(
-                                  'Observaciones:',
-                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 7,
-                                child: TextField(
-                                  controller: _observacionesController,
-                                  maxLines: 3,
-                                  decoration: InputDecoration(
-                                    hintText: 'Añadir observaciones relevantes...',
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 32),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: SizedBox(
-                              width: 180,
-                              height: 48,
-                              child: FilledButton(
-                                onPressed: _isSubmitting || _pacienteEncontrado == null ? null : _registrar,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF374151),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: _isSubmitting
-                                    ? const CircularProgressIndicator(color: Colors.white)
-                                    : const Text('Registrar vacuna', style: TextStyle(fontSize: 14)),
-                              ),
+                              ],
                             ),
-                          )
-                        ],
+                            const SizedBox(height: 32),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: SizedBox(
+                                width: 180,
+                                height: 48,
+                                child: FilledButton(
+                                  onPressed: _isSubmitting || _pacienteEncontrado == null ? null : _registrar,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF374151),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: _isSubmitting
+                                      ? const CircularProgressIndicator(color: Colors.white)
+                                      : const Text('Registrar vacuna', style: TextStyle(fontSize: 14)),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -559,9 +574,13 @@ class _RegistroVacunaPageState extends State<RegistroVacunaPage> {
                       'Campaña #${vacuna.campana?.id ?? '-'}',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     const Text('Observaciones:', style: TextStyle(fontWeight: FontWeight.w700)),
-                    Text(vacuna.observaciones),
+                    Text(
+                      vacuna.observaciones,
+                      overflow: TextOverflow.ellipsis, // Corta el texto si es muy largo
+                      maxLines: 2,
+                    ),
                   ],
                 ),
               ),

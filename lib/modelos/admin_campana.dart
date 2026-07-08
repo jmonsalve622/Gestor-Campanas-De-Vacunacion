@@ -1,42 +1,23 @@
-import 'cita.dart';
-
-class Persona {
+class AdminCampana {
   final String _rut;
   final String _nombres;
   final String _apellidos;
-  final DateTime _fechaNacimiento;
   final String _correo;
-  final String _telefono;
-  final List<Cita> _citas = [];
 
-  Persona({
+  AdminCampana({
     required String rut,
     required String nombres,
     required String apellidos,
-    required DateTime fechaNacimiento,
     required String correo,
-    required String telefono,
   }) : _rut = rut,
        _nombres = nombres,
        _apellidos = apellidos,
-       _fechaNacimiento = fechaNacimiento,
-       _correo = correo,
-       _telefono = telefono {
+       _correo = correo{
     if (!_esRutValido(_rut)) throw Exception("El RUT ingresado no es valido.");
 
     if (!_esCorreoValido(_correo))
       throw Exception("El correo ingresado no es valido.");
 
-    if (!_esTelefonoValido(_telefono))
-      throw Exception("El telefono ingresado no es valido.");
-  }
-
-  void agregarCita(Cita cita) {
-    _citas.add(cita);
-  }
-
-  void eliminarCita(Cita cita) {
-    _citas.remove(cita);
   }
 
   // Verificacion formato caracteres@caracteres.2oMasCaracteres.
@@ -44,12 +25,6 @@ class Persona {
     return RegExp(
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
     ).hasMatch(correo);
-  }
-
-  // Verifica telefono sea de Chile.
-  bool _esTelefonoValido(String telefono) {
-    String telefonoJunto = telefono.replaceAll(' ', '');
-    return RegExp(r'^\+569[0-9]{8}$').hasMatch(telefonoJunto);
   }
 
   // Verifica tanto el formato del RUT, como si cumple con los requisitos de nu numero verificador.
@@ -160,49 +135,16 @@ class Persona {
 
   String get apellidos => _apellidos;
 
-  DateTime getFechaNacimiento() {
-    return _fechaNacimiento;
-  }
-
-  DateTime get fechaNacimiento => _fechaNacimiento;
-
   String getCorreo() {
     return _correo;
   }
 
   String get correo => _correo;
-
-  String getTelefono() {
-    return _telefono;
-  }
-
-  String get telefono => _telefono;
-
-  List<Cita> getCitas() {
-    return _citas;
-  }
-
-  List<Cita> get citas => _citas;
-
-  int getEdad() {
-    DateTime hoy = DateTime.now();
-    int edad = hoy.year - _fechaNacimiento.year;
-
-    if (hoy.month < _fechaNacimiento.month ||
-        (hoy.month == _fechaNacimiento.month &&
-            hoy.day < _fechaNacimiento.day)) {
-      edad--;
-    }
-
-    return edad;
-  }
-
   @override
   String toString() {
     String pre =
-        "Persona{RUT=$_rut, nombres=$_nombres, apellidos=$_apellidos , fecha_nacimiento=${_fechaNacimiento.toString()}, correo=$_correo, telefono=$_telefono \n\nCitas:\n";
-    String listaCitas = _citas.map((c) => "- ${c.toString()}").join('\n');
+        "Persona{RUT=$_rut, nombres=$_nombres, apellidos=$_apellidos , correo=$_correo";
 
-    return pre + listaCitas;
+    return pre;
   }
 }

@@ -95,7 +95,7 @@ class AuthService {
           role: AppRole.paciente,
         ),
         AppUser(
-          email: 'alfonsogg111@gmail.com',
+          email: 'jpedreros2024@udec.cl',
           password: '123456',
           fullName: 'Gustavo Riquelme',
           rut: '66.666.666-6',

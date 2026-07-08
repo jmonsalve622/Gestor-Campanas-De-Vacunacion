@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:gestor_aplicacion/modelos/admin_campana.dart';
 
 import '../modelos/Persona.dart';
 import '../modelos/campana.dart';
@@ -56,6 +57,7 @@ class _AppShellState extends State<AppShell> {
 
   final List<Campana> _campanas = [];
   final List<CentroVacunacion> _centros = [];
+  final List<AdminCampana> _administradores = [];
   final Map<int, Persona> _personasPorCita = {};
   final Map<String, Persona> _pacientesRegistrados = {};
 
@@ -225,8 +227,22 @@ class _AppShellState extends State<AppShell> {
       nombres: 'Gustavo',
       apellidos: 'Riquelme',
       fechaNacimiento: DateTime(1990, 1, 1),
-      correo: 'alfonsogg111@gmail.com',
+      correo: 'jpedreros2024@udec.cl',
       telefono: '+56912345678',
+    );
+
+    final adminDemo = AdminCampana(
+      rut: '12.345.678-5', 
+      nombres: 'Roberto Carlos', 
+      apellidos: 'Manolas Carroza', 
+      correo: 'robertc@yahoo.cl'
+    );
+
+    final admin1 = AdminCampana(
+      rut: '11.111.111-1', 
+      nombres: 'Ignacio', 
+      apellidos: 'Freire Kant', 
+      correo: 'ignacio@demo.cl'
     );
 
     final citaReservada = centro1.reservarHorario(
@@ -262,6 +278,7 @@ class _AppShellState extends State<AppShell> {
 
     _campanas.addAll([campanaSarampion, campanaInvierno]);
     _centros.addAll([centro1, centro2]);
+    _administradores.addAll([adminDemo, admin1]);
     _pacientesRegistrados[pacienteDemo.correo] = pacienteDemo;
     _linkCampanaController.text = campanaSarampion.id.toString();
     _linkCentroController.text = centro1.id.toString();
@@ -571,37 +588,42 @@ class _AppShellState extends State<AppShell> {
       return;
     }
 
-    final fullName =
-        '${_pacienteNombresController.text.trim()} ${_pacienteApellidosController.text.trim()}'
-            .trim();
-    final email = _pacienteCorreoController.text.trim();
-    final password = _registroPacientePasswordController.text;
-
-    if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
-      setState(() {
-        _status = 'Completa nombre, correo y contraseña del paciente.';
-      });
-      return;
-    }
-
-    try {
-      _authService.registerPatient(
-        email: email,
-        password: password,
-        fullName: fullName,
-      );
-      final persona = _crearPersonaPaciente();
-      _pacientesRegistrados[email.toLowerCase()] = persona;
-      setState(() {
-        _status = 'Paciente $fullName registrado correctamente.';
-      });
-    } catch (error) {
-      setState(() {
-        _status =
-            'No se pudo registrar el paciente. Revisa los datos ingresados.';
-      });
-    }
+  final rut = _pacienteRutController.text.trim(); // Obtenemos el RUT
+  final email = _pacienteCorreoController.text.trim().toLowerCase();
+  
+  final bool rutExistente = _pacientesRegistrados.values.any((p) => p.rut == rut);
+  
+  if (rutExistente) {
+    setState(() => _status = 'Error: Ya existe un paciente registrado con el RUT $rut.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Ya existe un paciente con ese RUT.'), backgroundColor: Colors.red),
+    );
+    return;
   }
+
+  if (_pacientesRegistrados.containsKey(email)) {
+    setState(() => _status = 'Error: Ya existe un paciente con ese correo.');
+    return;
+  }
+
+  // ... resto de tu lógica de registro ...
+  final fullName = '${_pacienteNombresController.text.trim()} ${_pacienteApellidosController.text.trim()}'.trim();
+  final password = _registroPacientePasswordController.text;
+
+  if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
+    setState(() => _status = 'Completa nombre, correo y contraseña.');
+    return;
+  }
+
+  try {
+    _authService.registerPatient(email: email, password: password, fullName: fullName);
+    final persona = _crearPersonaPaciente();
+    _pacientesRegistrados[email.toLowerCase()] = persona;
+    setState(() => _status = 'Paciente $fullName registrado correctamente.');
+  } catch (error) {
+    setState(() => _status = 'Error al registrar.');
+  }
+}
 
   Future<void> _reservarHorario(CentroVacunacion centro, String horario, {String? fecha}) async {
     try {
@@ -1029,6 +1051,12 @@ class _AppShellState extends State<AppShell> {
       return CreacionCampanaPage(
         adminName: session.user.fullName,
         todosLosCentros: _centros,
+        todosLosAdministradores: _administradores,
+        onBack: () {
+          setState(() {
+            _showCreacionCampana = false; // Oculta esta vista y vuelve a mostrar el panel
+          });
+        },
         onCrearCampana: (nuevaCampana, vacunaNombre, admins) {
           setState(() {
             nuevaCampana.id = _nextCampanaId++;
@@ -1282,7 +1310,23 @@ class _AppShellState extends State<AppShell> {
                                   _status = 'Campaña ${campana.nombre} terminada.';
                                 });
                               },
-                            ),
+                              onEditarCampana: (campanaAEditar, nuevoNombre, nuevaDesc, nuevoInicio, nuevoFin) {
+                              setState(() {
+                                // Aquí modificamos las propiedades reales de la instancia
+                                campanaAEditar.nombre = nuevoNombre;
+                                campanaAEditar.descripcion = nuevaDesc;
+                                campanaAEditar.fechaInicio = nuevoInicio;
+                                campanaAEditar.fechaFin = nuevoFin;
+                                
+                                // Si la campaña estaba terminada pero extienden la fecha, la revivimos
+                                if (campanaAEditar.estado == 'TERMINADA' && DateTime.parse(nuevoFin).isAfter(DateTime.now())) {
+                                  campanaAEditar.estado = 'ACTIVA'; // Asumiendo que 'ACTIVA' es tu estado por defecto
+                                }
+
+                                _status = 'Campaña #${campanaAEditar.id} actualizada correctamente.';
+                              });
+                            },
+                          ),
                           ],
                           if (!esOperador) ...[
                             const SizedBox(height: 16),
@@ -1377,7 +1421,7 @@ class _AppShellState extends State<AppShell> {
                                   elevation: 4,
                                 ),
                               ),
-                            ),
+                            )
                         ],
                       ],
                     ),
@@ -1662,11 +1706,15 @@ class _AdminManagementPanel extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: 'Campaña disponible',
                   ),
+                  isExpanded: true,
                   items: campanas
                       .map(
                         (campana) => DropdownMenuItem<int?>(
                           value: campana.id,
-                          child: Text('${campana.id} - ${campana.nombre}'),
+                          child: Text(
+                            '${campana.id} - ${campana.nombre}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
@@ -1680,11 +1728,15 @@ class _AdminManagementPanel extends StatelessWidget {
                   decoration: const InputDecoration(
                     labelText: 'Centro disponible',
                   ),
+                  isExpanded: true,
                   items: centros
                       .map(
                         (centro) => DropdownMenuItem<int?>(
                           value: centro.id,
-                          child: Text('${centro.id} - ${centro.nombre}'),
+                          child: Text(
+                            '${centro.id} - ${centro.nombre}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
@@ -1709,10 +1761,16 @@ class _AdminManagementPanel extends StatelessWidget {
 }
 
 class _CampaignsPanel extends StatelessWidget {
-  const _CampaignsPanel({required this.campanas, required this.onTerminarCampana, required this.esAdmin});
+  const _CampaignsPanel({
+    required this.campanas, 
+    required this.onTerminarCampana, 
+    required this.onEditarCampana,
+    required this.esAdmin
+  });
 
   final List<Campana> campanas;
   final ValueChanged<Campana> onTerminarCampana;
+  final Function(Campana, String, String, String, String) onEditarCampana;
   final bool esAdmin;
 
   @override
@@ -1726,11 +1784,25 @@ class _CampaignsPanel extends StatelessWidget {
               runSpacing: 12,
               children: campanas
                   .map(
-                    (campana) => Chip(
+                    (campana) => InputChip(
                       label: Text(
                         '#${campana.id} ${campana.nombre} | Centros: ${campana.centros.length} | Estado: ${campana.estado}',
                       ),
                       backgroundColor: campana.estado == 'TERMINADA' ? Colors.grey[300] : null,
+                      onPressed: (!esAdmin) 
+                        ? null 
+                        : () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => _EditCampaignDialog(
+                                campana: campana,
+                                onSave: (nombre, descripcion, fechaInicio, fechaFin) {
+                                  onEditarCampana(campana, nombre, descripcion, fechaInicio, fechaFin);
+                                },
+                              ),
+                            );
+                          },
+                      tooltip: esAdmin ? 'Clic para editar campaña' : null,
                       onDeleted: (!esAdmin || campana.estado == 'TERMINADA')
                           ? null 
                           : () => onTerminarCampana(campana),
@@ -1867,9 +1939,11 @@ class _CenterCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                'Reservadas: ${centro.citasReservadas.length} | Completadas: ${centro.citasCompletadas.length} | Canceladas: ${centro.citasCanceladas.length}',
-                textAlign: TextAlign.right,
+              Expanded(
+                child: Text(
+                  'Reservadas: ${centro.citasReservadas.length} | Completadas: ${centro.citasCompletadas.length} | Canceladas: ${centro.citasCanceladas.length}',
+                  textAlign: TextAlign.right,
+                ),
               ),
             ],
           ),
@@ -2139,6 +2213,150 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _EditCampaignDialog extends StatefulWidget {
+  final Campana campana;
+  final Function(String nombre, String descripcion, String fechaInicio, String fechaFin) onSave;
+
+  const _EditCampaignDialog({
+    required this.campana,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditCampaignDialog> createState() => _EditCampaignDialogState();
+}
+
+class _EditCampaignDialogState extends State<_EditCampaignDialog> {
+  late TextEditingController _nombreCtrl;
+  late TextEditingController _descripcionCtrl;
+  DateTime? _fechaInicio;
+  DateTime? _fechaFin;
+
+  @override
+  void initState() {
+    super.initState();
+    _nombreCtrl = TextEditingController(text: widget.campana.nombre);
+    _descripcionCtrl = TextEditingController(text: widget.campana.descripcion);
+    
+    // Parsear las fechas actuales
+    try {
+      _fechaInicio = DateTime.parse(widget.campana.fechaInicio);
+      _fechaFin = DateTime.parse(widget.campana.fechaFin);
+    } catch (e) {
+      _fechaInicio = DateTime.now();
+      _fechaFin = DateTime.now().add(const Duration(days: 30));
+    }
+  }
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _descripcionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _seleccionarFecha(bool isInicio) async {
+    final DateTime fechaMinima = isInicio ? DateTime.now() : (_fechaInicio ?? DateTime.now());
+    final DateTime fechaInicial = isInicio ? (_fechaInicio ?? DateTime.now()) : (_fechaFin ?? _fechaInicio ?? DateTime.now());
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: fechaInicial,
+      firstDate: DateTime(2000), // Permitimos ver el pasado por si la campaña empezó antes
+      lastDate: DateTime(2101),
+      helpText: isInicio ? 'Fecha de Inicio' : 'Fecha de Fin',
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isInicio) {
+          _fechaInicio = picked;
+          if (_fechaFin != null && _fechaFin!.isBefore(_fechaInicio!)) {
+            _fechaFin = null;
+          }
+        } else {
+          _fechaFin = picked;
+        }
+      });
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Editar Campaña #${widget.campana.id}'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nombreCtrl,
+              decoration: const InputDecoration(labelText: 'Nombre de la campaña'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descripcionCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Descripción'),
+            ),
+            const SizedBox(height: 16),
+            const Text('Vigencia:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _seleccionarFecha(true),
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(_fechaInicio != null ? _formatDate(_fechaInicio!) : 'Inicio'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _seleccionarFecha(false),
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: Text(_fechaFin != null ? _formatDate(_fechaFin!) : 'Fin'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_nombreCtrl.text.isEmpty || _fechaInicio == null || _fechaFin == null) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 const SnackBar(content: Text('Por favor completa todos los campos')),
+               );
+               return;
+            }
+            widget.onSave(
+              _nombreCtrl.text.trim(),
+              _descripcionCtrl.text.trim(),
+              _formatDate(_fechaInicio!),
+              _formatDate(_fechaFin!),
+            );
+            Navigator.of(context).pop();
+          },
+          child: const Text('Guardar Cambios'),
+        ),
+      ],
     );
   }
 }
